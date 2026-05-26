@@ -58,7 +58,7 @@ logic [19:0] done_pix_id;
 logic        pix_done;
 logic        hit;
 
-// Sakthi stub → fb_write
+// Sakthi Colour Stuff → fb_write
 logic [23:0] rgb;
 logic        rgb_valid;
 
@@ -129,7 +129,7 @@ fb_write fb_write_inst (
     .bram_we(bram_we)
 );
 
-// Clock Generation
+// Clock Gen
 initial clk = 1'b0;
 always #5 clk = ~clk;
 
@@ -139,7 +139,7 @@ initial begin
     $dumpvars(0, integration_tb);
 end
 
-// Sakthi stub
+// Sakthi Colours Stuff (adding random inputs)
 always @(posedge clk) begin
     rgb_valid <= pix_done;
     rgb       <= 24'hFF0000;
@@ -184,7 +184,7 @@ initial begin
 
     // TODO: Add Vincent stub here when ready
     // feedback_ctrl sends out_pix_id, out_pos, out_ray and out_iter to Vincent
-    // Vincent then does one of two things:
+    // Vincent will do either one or the other:
     // a) HIT/MISS → send pix_done, done_pix_id and hit flag to fb_write
     // b) FEEDBACK → send fb_validity + all fb_ signals back to feedback_ctrl
 

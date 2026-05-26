@@ -1,6 +1,5 @@
 module pixel_dispatch_tb;
 
-// Signal Declarations
 logic        clk;
 logic        rst;
 logic        pipeline_ready;
@@ -24,7 +23,7 @@ pixel_dispatch dut (
     .valid(valid)
 );
 
-// Clock Generation
+// Clock Gen
 initial clk = 1'b0;
 always #5 clk = ~clk;
 
@@ -34,7 +33,7 @@ initial begin
     $dumpvars(0, pixel_dispatch_tb);
 end
 
-// Initialise seen array
+// Initialising the seen array
 initial begin
     for (counter = 0; counter <= 921599; counter = counter + 1) begin
         seen[counter] = 1'b0;
@@ -61,7 +60,7 @@ initial begin
     $finish;
 end
 
-// Duplicate checking
+// Checking for duplicate pixels
 always @(posedge clk) begin
     if (valid) begin
         if (seen[pix_id])

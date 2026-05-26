@@ -28,7 +28,7 @@ fb_write dut (
     .bram_we(bram_we)
 );
 
-// Clock Generation
+// Clock Gen
 initial clk = 1'b0;
 always #5 clk = ~clk;
 

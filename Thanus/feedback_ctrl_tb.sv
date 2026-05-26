@@ -65,7 +65,7 @@ feedback_ctrl dut (
     .stall(stall)
 );
 
-// Clock Generation
+// Clock Gen
 initial clk = 1'b0;
 always #5 clk = ~clk;
 
