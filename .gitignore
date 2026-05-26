@@ -1,0 +1,7 @@
+react_interactive/node_modules/
+react_interactive/dist/
+
+cpu_reference/*.exe
+cpu_reference/benchmark.csv
+cpu_reference/out.ppm
+cpu_reference/out.png
