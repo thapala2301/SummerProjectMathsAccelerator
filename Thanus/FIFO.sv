@@ -18,7 +18,7 @@ module FIFO #(
     logic [$clog2(DEPTH)-1:0] read_ptr;
     logic [$clog2(DEPTH):0]   count;
 
-    // Write operation
+    // Write 
     always_ff @(posedge clk) begin
         if (rst) begin
             write_ptr <= 1'b0;
@@ -30,7 +30,7 @@ module FIFO #(
         end
     end
 
-    // Read operation
+    // Read
     always_ff @(posedge clk) begin
         if (rst) begin
             read_ptr <= 1'b0;
@@ -40,8 +40,7 @@ module FIFO #(
             end
         end
     end
-
-    // Continuous read data assignment
+    
     assign rd_data = mem[read_ptr]; 
 
     // Full and empty flags
