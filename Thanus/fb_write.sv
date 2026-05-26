@@ -8,7 +8,7 @@ module fb_write(
 
     input logic [19:0] pix_id,
     input logic        pix_done,
-    input logic        hit,
+    input logic        hit, // Not in use rn
 
     input logic [23:0] rgb,
     input logic        rgb_valid,
