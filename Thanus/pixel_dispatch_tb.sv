@@ -11,6 +11,7 @@ logic        valid;
 
 logic        seen [0:921599];
 integer      counter;
+integer      errors;
 
 // Instantiation
 pixel_dispatch dut (
@@ -35,36 +36,46 @@ end
 
 // Stimulus
 initial begin
+    errors         = 0;
     rst            = 1'b1;
     pipeline_ready = 1'b0;
 
     for (counter = 0; counter <= 921599; counter = counter + 1)
         seen[counter] = 1'b0;
 
-    @(posedge clk);
-    @(posedge clk);
+    repeat(4) @(posedge clk);
     rst = 1'b0;
-
     pipeline_ready = 1'b1;
-    repeat(922600) @(posedge clk);
 
-    // Final check
+    @(posedge clk);
+
+    // Checking for duplicate pixels
+    repeat(921600) begin
+        @(negedge clk);
+        if (valid) begin
+            if (seen[pix_id]) begin
+                $display("Duplicate pixel: %0d x=%0d y=%0d", pix_id, x_pixel, y_pixel);
+                errors = errors + 1;
+            end else begin
+                seen[pix_id] = 1'b1;
+            end
+        end
+    end
+
+    // Final Check
     for (counter = 0; counter <= 921599; counter = counter + 1) begin
-        if (!seen[counter])
+        if (!seen[counter]) begin
             $display("Error: pixel %0d never emitted", counter);
+            errors = errors + 1;
+        end
     end
-    $display("Check complete");
-    $finish;
-end
 
-// Checking for duplicate pixels
-always @(posedge clk) begin
-    if (valid) begin
-        if (seen[pix_id])
-            $display("Duplicate pixel: %0d", pix_id);
-        else
-            seen[pix_id] = 1'b1;
-    end
+    if (errors == 0)
+        $display("PASS: all 921600 pixels emitted exactly once");
+    else
+        $display("FAIL: %0d errors found", errors);
+
+    $finish;
 end
 
 endmodule

@@ -2,6 +2,7 @@ module pixel_dispatch(
     input  logic        clk,
     input  logic        rst,
     input  logic        pipeline_ready,
+    
     output logic [10:0] x_pixel,
     output logic [9:0]  y_pixel,
     output logic        valid,
@@ -9,15 +10,14 @@ module pixel_dispatch(
 );
 
 assign pix_id = (y_pixel * 1280) + x_pixel;
+assign valid  = ~rst & pipeline_ready;
 
 always_ff @(posedge clk) begin
     if (rst) begin
         x_pixel <= 1'b0;
         y_pixel <= 1'b0;
-        valid   <= 1'b0;
     end
     else if (pipeline_ready) begin
-        valid <= 1'b1;
         if (x_pixel == 11'd1279 && y_pixel == 10'd719) begin
             x_pixel <= 1'b0;
             y_pixel <= 1'b0;
