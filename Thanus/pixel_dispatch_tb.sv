@@ -33,17 +33,14 @@ initial begin
     $dumpvars(0, pixel_dispatch_tb);
 end
 
-// Initialising the seen array
-initial begin
-    for (counter = 0; counter <= 921599; counter = counter + 1) begin
-        seen[counter] = 1'b0;
-    end
-end
-
 // Stimulus
 initial begin
     rst            = 1'b1;
     pipeline_ready = 1'b0;
+
+    for (counter = 0; counter <= 921599; counter = counter + 1)
+        seen[counter] = 1'b0;
+
     @(posedge clk);
     @(posedge clk);
     rst = 1'b0;
