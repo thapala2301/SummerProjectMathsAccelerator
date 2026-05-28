@@ -65,34 +65,30 @@ feedback_ctrl dut (
     .stall(stall)
 );
 
-// Clock Gen
 initial clk = 1'b0;
 always #5 clk = ~clk;
 
-// Waveform Dump
 initial begin
     $dumpfile("feedback_ctrl_tb.vcd");
     $dumpvars(0, feedback_ctrl_tb);
 end
 
-// Stimulus
 initial begin
-    // Initialise all inputs to 0
-    clk                = 0;
-    pipeline_ready     = 0;
-    valid              = 0;
-    x_pixel            = 0;
-    y_pixel            = 0;
-    pix_id             = 0;
-    fb_validity        = 0;
-    fb_pix_id          = 0;
-    fb_pos_x           = 0;
-    fb_pos_y           = 0;
-    fb_pos_z           = 0;
-    fb_ray_dir_x       = 0;
-    fb_ray_dir_y       = 0;
-    fb_ray_dir_z       = 0;
-    fb_iteration_count = 0;
+    clk                = 1'b0;
+    pipeline_ready     = 1'b0;
+    valid              = 1'b0;
+    x_pixel            = 11'd0;
+    y_pixel            = 10'd0;
+    pix_id             = 20'd0;
+    fb_validity        = 1'b0;
+    fb_pix_id          = 20'd0;
+    fb_pos_x           = 32'd0;
+    fb_pos_y           = 32'd0;
+    fb_pos_z           = 32'd0;
+    fb_ray_dir_x       = 32'd0;
+    fb_ray_dir_y       = 32'd0;
+    fb_ray_dir_z       = 32'd0;
+    fb_iteration_count = 8'd0;
 
     rst = 1'b1;
     @(posedge clk);
@@ -100,21 +96,22 @@ initial begin
     rst = 1'b0;
 
     // Scenario 1 - Fresh pixels only
-    pipeline_ready     = 1;
-    valid              = 1;
+    pipeline_ready     = 1'b1;
+    valid              = 1'b1;
     x_pixel            = 11'd1000;
     y_pixel            = 10'd500;
     pix_id             = 20'd641000;
-    fb_validity        = 0;
-    fb_pix_id          = 0;
-    fb_pos_x           = 0;
-    fb_pos_y           = 0;
-    fb_pos_z           = 0;
-    fb_ray_dir_x       = 0;
-    fb_ray_dir_y       = 0;
-    fb_ray_dir_z       = 0;
-    fb_iteration_count = 0;
+    fb_validity        = 1'b0;
+    fb_pix_id          = 20'd0;
+    fb_pos_x           = 32'd0;
+    fb_pos_y           = 32'd0;
+    fb_pos_z           = 32'd0;
+    fb_ray_dir_x       = 32'd0;
+    fb_ray_dir_y       = 32'd0;
+    fb_ray_dir_z       = 32'd0;
+    fb_iteration_count = 8'd0;
     @(posedge clk);
+    @(negedge clk);
 
     if (out_x == x_pixel)
         $display("PASS: Output X is correct!");
@@ -142,12 +139,12 @@ initial begin
         $display("FAIL: Incorrect stall signal!");
 
     // Scenario 2 - Returning pixels only
-    pipeline_ready     = 1;
-    valid              = 0;
+    pipeline_ready     = 1'b1;
+    valid              = 1'b0;
     x_pixel            = 11'd1000;
     y_pixel            = 10'd500;
     pix_id             = 20'd641000;
-    fb_validity        = 1;
+    fb_validity        = 1'b1;
     fb_pix_id          = 20'd641000;
     fb_pos_x           = 32'h3F800000;
     fb_pos_y           = 32'h40000000;
@@ -158,6 +155,8 @@ initial begin
     fb_iteration_count = 8'd5;
     @(posedge clk);
     @(posedge clk);
+    @(posedge clk);
+    @(negedge clk);
 
     if (out_pix_id == fb_pix_id)
         $display("PASS: Output ID is correct!");
@@ -175,12 +174,12 @@ initial begin
         $display("FAIL: Incorrect stall signal!");
 
     // Scenario 3 - Mixed, returning pixels should take priority
-    pipeline_ready     = 1;
-    valid              = 1;
+    pipeline_ready     = 1'b1;
+    valid              = 1'b1;
     x_pixel            = 11'd200;
     y_pixel            = 10'd100;
     pix_id             = 20'd128200;
-    fb_validity        = 1;
+    fb_validity        = 1'b1;
     fb_pix_id          = 20'd641000;
     fb_pos_x           = 32'h3F800000;
     fb_pos_y           = 32'h40000000;
@@ -191,13 +190,15 @@ initial begin
     fb_iteration_count = 8'd10;
     @(posedge clk);
     @(posedge clk);
+    @(posedge clk);
+    @(negedge clk);
 
     if (out_pix_id == fb_pix_id)
         $display("PASS: Returning pixel took priority!");
     else
         $display("FAIL: Fresh pixel wrongly took priority!");
 
-    if (out_x == 0)
+    if (out_x == 1'b0)
         $display("PASS: out_x correct for returning pixel!");
     else
         $display("FAIL: out_x should be 0 for returning pixel!");

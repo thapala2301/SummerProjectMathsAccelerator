@@ -76,14 +76,14 @@ module feedback_ctrl (
         else if (!fifo_empty && pipeline_ready) begin
             out_x               <= 1'b0;
             out_y               <= 1'b0;
-            out_pix_id          <= fifo_rd_data[19:0];
-            out_pos_x           <= fifo_rd_data[51:20];
-            out_pos_y           <= fifo_rd_data[83:52];
-            out_pos_z           <= fifo_rd_data[115:84];
-            out_ray_dir_x       <= fifo_rd_data[147:116];
-            out_ray_dir_y       <= fifo_rd_data[179:148];
-            out_ray_dir_z       <= fifo_rd_data[211:180];
-            out_iteration_count <= fifo_rd_data[219:212];
+            out_pix_id          <= fifo_rd_data[219:200];
+            out_pos_x           <= fifo_rd_data[199:168];
+            out_pos_y           <= fifo_rd_data[167:136];
+            out_pos_z           <= fifo_rd_data[135:104];
+            out_ray_dir_x       <= fifo_rd_data[103:72];
+            out_ray_dir_y       <= fifo_rd_data[71:40];
+            out_ray_dir_z       <= fifo_rd_data[39:8];
+            out_iteration_count <= fifo_rd_data[7:0];
             out_validity        <= 1'b1;
         end
         else if (fifo_empty && pipeline_ready && valid) begin
