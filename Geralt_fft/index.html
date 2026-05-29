@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zynq Hardware vs Software FFT Visualizer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+        .canvas-container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 1024px; }
+        canvas { background-color: #000000; border: 2px solid #333; border-radius: 8px; margin-top: 10px; width: 100%; height: 250px; }
+        audio { margin-top: 10px; width: 400px; }
+        .status { margin-top: 10px; font-size: 14px; color: #ff4444; }
+        h3 { margin-top: 20px; margin-bottom: 5px; color: #00ff00; text-shadow: 0 0 5px rgba(0,255,0,0.5); }
+        h3.software { color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
+    </style>
+</head>
+<body>
+
+    <h2>FFT Verification: Zynq FPGA vs Software (Chrome)</h2>
+    
+    <audio id="audioPlayer" src="belief.mp3" controls crossorigin="anonymous"></audio>
+    <div id="statusText" class="status">WebSocket: Disconnected</div>
+
+    <div class="canvas-container">
+        <h3>1. FPGA (Hardware) FFT Result</h3>
+        <canvas id="zynqCanvas" width="1024" height="250"></canvas>
+
+        <h3 class="software">2. Web Audio (Software) FFT Result</h3>
+        <canvas id="softwareCanvas" width="1024" height="250"></canvas>
+    </div>
+
+    <script>
+        // 1. Setup WebSocket and Status
+        const ws = new WebSocket('ws://192.168.137.49:8765');
+        const statusText = document.getElementById('statusText');
+
+        ws.onopen = () => { statusText.textContent = "WebSocket: Connected to Hardware"; statusText.style.color = "#00ff00"; };
+        ws.onerror = () => { statusText.textContent = "WebSocket: Connection Error"; statusText.style.color = "#ff4444"; };
+
+        // 2. Setup Canvases
+        const zynqCanvas = document.getElementById('zynqCanvas');
+        const zynqCtx = zynqCanvas.getContext('2d');
+        const softwareCanvas = document.getElementById('softwareCanvas');
+        const softwareCtx = softwareCanvas.getContext('2d');
+
+        // 3. Setup Audio Pipeline (THE MODERN, NON-BLOCKING WAY)
+        const audioEl = document.getElementById('audioPlayer');
+        let audioContext, source, softwareAnalyser, timeAnalyser;
+        let isPlaying = false;
+
+        audioEl.onplay = () => {
+            isPlaying = true;
+            if (!audioContext) {
+                audioContext = new AudioContext();
+                source = audioContext.createMediaElementSource(audioEl);
+
+                // Analyser 1: For the Software FFT (Bottom Graph)
+                softwareAnalyser = audioContext.createAnalyser();
+                softwareAnalyser.fftSize = 2048; 
+
+                // Analyser 2: Passively grabs raw audio to send to the FPGA
+                timeAnalyser = audioContext.createAnalyser();
+                timeAnalyser.fftSize = 1024; // Exactly 1024 samples for hardware
+
+                // CONNECT PIPELINES
+                source.connect(softwareAnalyser);
+                source.connect(timeAnalyser);
+        
+                // This direct connection GUARANTEES sound through your headphones
+                source.connect(audioContext.destination); 
+
+                // Start loops
+                drawSoftwareFFT(); 
+                sendDataToFPGA();
+            }
+        };
+
+        audioEl.onpause = () => { isPlaying = false; };
+
+        // New function: Sends data smoothly without freezing the browser
+        const timeData = new Float32Array(1024);
+        function sendDataToFPGA() {
+            if (isPlaying && ws.readyState === WebSocket.OPEN) {
+                // Grab 1024 raw audio samples silently
+                timeAnalyser.getFloatTimeDomainData(timeData);
+                // Send to Python
+                ws.send(timeData.buffer);
+            }
+            // Throttle the network to ~30 FPS so your browser never freezes
+            setTimeout(sendDataToFPGA, 33);
+        }
+
+        // 4. Receive Zynq (FPGA) Data and Draw
+        ws.onmessage = async (event) => {
+            const zynqFFTData = new Float32Array(await event.data.arrayBuffer());
+            drawZynqFFT(zynqFFTData);
+        };
+
+        function drawZynqFFT(data) {
+            zynqCtx.clearRect(0, 0, zynqCanvas.width, zynqCanvas.height);
+            const numPoints = 512; 
+            const barWidth = zynqCanvas.width / numPoints;
+    
+            for (let i = 0; i < numPoints; i++) {
+                // TWEAK THIS MULTIPLIER to scale the hardware data properly!
+                const magnitude = data[i];
+                const barHeight = magnitude * 0.00001; 
+
+                const r = Math.min(255, i * 2);
+                const g = 255 - Math.min(255, i / 2);
+                zynqCtx.fillStyle = `rgb(${r}, ${g}, 0)`;
+                zynqCtx.fillRect(i * barWidth, zynqCanvas.height - barHeight, barWidth, barHeight);
+            }
+        }
+
+        // 5. Calculate and Draw Software results
+        function drawSoftwareFFT() {
+            requestAnimationFrame(drawSoftwareFFT); 
+            const numPoints = softwareAnalyser.frequencyBinCount; 
+            const dataArray = new Uint8Array(numPoints); 
+            softwareAnalyser.getByteFrequencyData(dataArray); 
+
+            softwareCtx.clearRect(0, 0, softwareCanvas.width, softwareCanvas.height);
+            const barWidth = softwareCanvas.width / 512; 
+
+            for (let i = 0; i < 512; i++) {
+                const magnitude = dataArray[i]; 
+                const barHeight = magnitude; 
+
+                const g = Math.min(255, i / 2);
+                const b = 255 - Math.min(255, i / 2);
+                softwareCtx.fillStyle = `rgb(0, ${g}, ${b})`;
+                softwareCtx.fillRect(i * barWidth, softwareCanvas.height - barHeight, barWidth, barHeight);
+            }
+        }
+    </script>
+</body>
+</html>
