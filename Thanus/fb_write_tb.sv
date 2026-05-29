@@ -8,7 +8,6 @@ logic        pix_done;
 logic        hit;
 
 logic [23:0] rgb;
-logic        rgb_valid;
 
 logic [19:0] bram_addr;
 logic [23:0] bram_data_in;
@@ -22,7 +21,6 @@ fb_write dut (
     .pix_done(pix_done),
     .hit(hit),
     .rgb(rgb),
-    .rgb_valid(rgb_valid),
     .bram_addr(bram_addr),
     .bram_data_in(bram_data_in),
     .bram_we(bram_we)
@@ -46,7 +44,6 @@ initial begin
     rst = 1'b0;
 
     pix_done  = 1'b1;
-    rgb_valid = 1'b1;
     pix_id    = 20'd6969;
     rgb       = 24'hFF0000;
     @(posedge clk);
@@ -67,7 +64,6 @@ initial begin
         $display("FAIL: bram_data_in wrong");
 
     pix_done  = 1'b0;
-    rgb_valid = 1'b1;
     @(posedge clk);
 
     if (!bram_we)
@@ -86,13 +82,12 @@ initial begin
         $display("FAIL: bram_data_in wrong");
 
     pix_done  = 1'b1;
-    rgb_valid = 1'b0;
     @(posedge clk);
 
-    if (!bram_we)
+    if (bram_we)
         $display("PASS: bram_we correct");
     else
-        $display("FAIL: bram_we should be low");
+        $display("FAIL: bram_we should be high");
 
     if (bram_addr == pix_id)
         $display("PASS: bram_addr correct");
@@ -105,7 +100,6 @@ initial begin
         $display("FAIL: bram_data_in wrong");
 
     pix_done  = 1'b0;
-    rgb_valid = 1'b0;
     @(posedge clk);
 
     if (!bram_we)
