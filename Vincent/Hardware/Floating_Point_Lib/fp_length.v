@@ -23,7 +23,7 @@ fp_add add_tempx2y2_z2(.clk(clk), .a(tempadd_x2_y2), .b(z2), .out(sum_x2_y2_z2))
 
 //TOTAL up to here : 10 clk latency. so need value 10 clk later
 //delay but 10 clk, then sum_x2_y2_z2 matches isqrt_sum delay
-state_pipe #(.WIDTH(27), .DEPTH(10)) pipe_sum(.clk(clk), .in(sum_x2_y2_z2), .out(sum_delayed)));
+state_pipe #(.WIDTH(27), .DEPTH(10)) pipe_sum(.clk(clk), .in(sum_x2_y2_z2), .out(sum_delayed));
 //compute isqrt
 fp_isqrt inst_isqrt_sum(.clk(clk), .a(sum_x2_y2_z2), .out(isqrt_sum));
 //mul (sqrtx)^-1 * x
