@@ -1,125 +1,151 @@
-//pipelined inverse square root  y = 1 / sqrt(x)
-//newton-Raphson iteration y_{n+1} = y_n * (1.5 - 0.5 * x * y_n²)
-//Latency 2 (initial guess) + NUM_ITER * 2 cycles
-// Fixed point Q2.29 signed
+`timescale 1ns/1ps
 
-module isqrt_pipe #(
-    parameter int W        = 32,
-    parameter int FRAC     = 29,
-    parameter int NUM_ITER = 3
-) (
-    input  logic              clk,
-    input  logic              rst_n,
-
-    input  logic signed [W-1:0]  x_in,       // Q2.29, must be positive
-    input  logic                 valid_in,
-
-    output logic signed [W-1:0]  y_out,       // Q2.29 ≈ 1/sqrt(x_in)
-    output logic                 valid_out
+module isqrt_pipe (
+    input logic clk,
+    input logic rst_n,
+    input logic [26:0] x_in,
+    input logic valid_in,
+    output logic [26:0] y_out,
+    output logic valid_out
 );
+    localparam int LAT = 5;
 
-    //Q2.29 multiply
-    function automatic logic signed [W-1:0] qmul (
-        input logic signed [W-1:0] a,
-        input logic signed [W-1:0] b
-    );
-        logic signed [2*W-1:0] p;
-        p = a * b;
-        return p[W + FRAC - 1 : FRAC];
-    endfunction
-
-    // Constants in Q2.29
-    localparam logic signed [W-1:0] ONE_POINT_FIVE = 32'h3000_0000; // 1.5
-    localparam logic signed [W-1:0] HALF           = 32'h1000_0000; // 0.5
-
-    //Initial guess
-    logic                 st0_v;
-
-    // Leading-zero count
-    logic [4:0] lzc;
-    always_comb begin : lzc_block
-        lzc = 5'd31;
-        for (int b = W-2; b >= 0; b--) begin
-            if (x_in[b]) lzc = 5'(W - 1 - b);
-        end
+    // valid tracking
+    logic [LAT-1:0] valid_sr;
+    always_ff @(posedge clk) begin
+        if (!rst_n) valid_sr <= '0;
+        else valid_sr <= {valid_sr[LAT-2:0], valid_in};
     end
+    assign valid_out = valid_sr[LAT-1];
 
-    function automatic logic signed [W-1:0] seed_lut(input logic [4:0] lz);
-        // 1/sqrt(value) ~ 2^(-(lz-FRAC+1)/2) in Q2.29
-        // = 2^(FRAC - (lz-FRAC+1)/2) in integer terms
-        case (lz)
-            5'd0:  return 32'h0800_0000;  // ~0.25  (x≈4)
-            5'd1:  return 32'h0B50_4F33;  // ~0.354
-            5'd2:  return 32'h1000_0000;  // ~0.5
-            5'd3:  return 32'h16A0_9E66;  // ~0.707
-            5'd4:  return 32'h2000_0000;  // ~1.0
-            5'd5:  return 32'h2D41_3CCD;  // ~1.414
-            5'd6:  return 32'h4000_0000;  // ~2.0    (x≈0.016)
-            default: return 32'h2000_0000;
-        endcase
+    function automatic logic [26:0] fp_mul(
+        input logic [26:0] a,
+        input logic [26:0] b
+    );
+        logic s;
+        logic [7:0] ea, eb, exp_r;
+        logic [18:0] ma, mb;
+        logic [37:0] prod;
+        logic [17:0] frac_r;
+
+        if (a[25:18] == 8'h00 || b[25:18] == 8'h00) return 27'h0;
+
+        s = a[26] ^ b[26];
+        ea = a[25:18];
+        eb = b[25:18];
+        ma = {1'b1, a[17:0]};
+        mb = {1'b1, b[17:0]};
+        prod = ma * mb;
+
+        if(prod[37]) begin
+            frac_r = prod[36:19];
+            exp_r = ea + eb - 127 + 1;
+        end else begin
+            frac_r = prod[35:18];
+            exp_r = ea + eb - 127;
+        end
+
+        if(exp_r == 8'h00 || exp_r >= 8'hFF) return 27'h0;
+        return {s, exp_r, frac_r};
     endfunction
+
+    localparam logic [26:0] MAGIC = 27'h2FDFBF0;
+    localparam logic [26:0] ONE_POINT_FIVE = 27'h1FE0000;
+    localparam logic [26:0] HALF = 27'h1F80000;
+
+    // stage 1 magic seed
+    logic [26:0] st1_guess, st1_x;
 
     always_ff @(posedge clk) begin
-        if (!rst_n) st0_v <= 1'b0;
-        else begin
-            st0_x    <= x_in;
-            st0_seed <= seed_lut(lzc);
-            st0_v    <= valid_in;
-        end
+        st1_x <= x_in;
+        st1_guess <= MAGIC - {1'b0, x_in[26:1]};
     end
 
-    //Newton-Raphson iteration
+    // stage 2 0.5 * x * y0^2
+    logic [26:0] st2_corr_raw, st2_y0;
 
-    // Arrays of pipeline regs for x and y
-    logic signed [W-1:0] iter_x [0:NUM_ITER];
-    logic signed [W-1:0] iter_y [0:NUM_ITER];
-    logic                iter_v [0:NUM_ITER];
+    always_ff @(posedge clk) begin
+        automatic logic [26:0] y0_sq, half_x;
+        y0_sq = fp_mul(st1_guess, st1_guess);
+        half_x = fp_mul(HALF, st1_x);
+        st2_corr_raw <= fp_mul(half_x, y0_sq);
+        st2_y0 <= st1_guess;
+    end
 
-    // Intermediate per-iteration register (between stage A and B)
-    logic signed [W-1:0] mid_x  [0:NUM_ITER-1];
-    logic signed [W-1:0] mid_y  [0:NUM_ITER-1];
-    logic signed [W-1:0] mid_c  [0:NUM_ITER-1];  // correction = 1.5 - 0.5*x*y²
-    logic                mid_v  [0:NUM_ITER-1];
+    // stage 3 fp_add alignment for 1.5 - corr_raw
+    logic [7:0] st3_exp;
+    logic [19:0] st3_sig_big, st3_sig_sml;
+    logic st3_sign_big, st3_sign_sml;
+    logic [26:0] st3_y0;
 
-    // Seed feeds iteration 0
-    assign iter_x[0] = st0_x;
-    assign iter_y[0] = st0_seed;
-    assign iter_v[0] = st0_v;
+    always_ff @(posedge clk) begin
+        automatic logic [26:0] b_neg;
+        automatic logic [7:0] ea, eb, exp_diff;
+        automatic logic [18:0] ma, mb;
+        automatic logic sa, sb;
 
-    generate
-        genvar it;
-        for (it = 0; it < NUM_ITER; it++) begin : gen_nr
+        b_neg = {~st2_corr_raw[26], st2_corr_raw[25:0]};
 
-            // Stage A: y² then 0.5*x*y²,  correction = 1.5 - 0.5*x*y²
-            always_ff @(posedge clk) begin
-                if (!rst_n) mid_v[it] <= 1'b0;
-                else begin
-                    automatic logic signed [W-1:0] y2, half_x_y2;
-                    y2          = qmul(iter_y[it], iter_y[it]);
-                    half_x_y2   = qmul(qmul(HALF, iter_x[it]), y2);
-                    mid_c[it]   <= ONE_POINT_FIVE - half_x_y2;
-                    mid_y[it]   <= iter_y[it];
-                    mid_x[it]   <= iter_x[it];
-                    mid_v[it]   <= iter_v[it];
-                end
-            end
+        sa = ONE_POINT_FIVE[26]; ea = ONE_POINT_FIVE[25:18]; ma = {1'b1, ONE_POINT_FIVE[17:0]};
+        sb = b_neg[26]; eb = b_neg[25:18]; mb = {1'b1, b_neg[17:0]};
 
-            // Stage B: y_new = y * correction
-            always_ff @(posedge clk) begin
-                if (!rst_n) iter_v[it+1] <= 1'b0;
-                else begin
-                    iter_y[it+1] <= qmul(mid_y[it], mid_c[it]);
-                    iter_x[it+1] <= mid_x[it];
-                    iter_v[it+1] <= mid_v[it];
-                end
-            end
-
+        if(eb > ea) begin
+            automatic logic [7:0] tmp_e;
+            automatic logic [18:0] tmp_m;
+            automatic logic tmp_s;
+            tmp_e = ea; tmp_m = ma; tmp_s = sa;
+            ea = eb; ma = mb; sa = sb;
+            eb = tmp_e; mb = tmp_m; sb = tmp_s;
         end
-    endgenerate
 
-    // Output
-    assign y_out    = iter_y[NUM_ITER];
-    assign valid_out = iter_v[NUM_ITER];
+        exp_diff = ea - eb;
+        if(exp_diff >= 19) mb = 19'h0;
+        else mb = mb >> exp_diff;
+
+        st3_exp <= ea;
+        st3_sign_big <= sa;
+        st3_sign_sml <= sb;
+        st3_sig_big <= {1'b0, ma};
+        st3_sig_sml <= {1'b0, mb};
+        st3_y0 <= st2_y0;
+    end
+
+    // stage 4 fp_add normalise then y1 = y0 * correction
+    always_ff @(posedge clk) begin
+        automatic logic [19:0] sr;
+        automatic logic sign_r;
+        automatic logic [7:0] er;
+        automatic logic [4:0] lz;
+        automatic logic [26:0] correction;
+
+        er = st3_exp;
+
+        if(st3_sign_big == st3_sign_sml) begin
+            sr = st3_sig_big + st3_sig_sml;
+            sign_r = st3_sign_big;
+            if(sr[19]) begin
+                sr = sr >> 1;
+                er = er + 1;
+            end
+        end else begin
+            sr = st3_sig_big - st3_sig_sml;
+            sign_r = st3_sign_big;
+            lz = 0;
+            for(int i = 18; i >= 1; i--) begin
+                if(!sr[i]) lz = lz + 1;
+                else break;
+            end
+            sr = sr << lz;
+            if(er >= lz) er = er - lz;
+            else begin er = 0; end
+        end
+
+        if(er == 8'h00 || sr[18:1] == 18'h0)
+            correction = 27'h0;
+        else
+            correction = {sign_r, er, sr[17:0]};
+
+        y_out <= fp_mul(st3_y0, correction);
+    end
 
 endmodule
-
