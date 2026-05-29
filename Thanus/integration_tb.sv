@@ -19,13 +19,13 @@ module integration_tb;
 logic        clk;
 logic        rst;
 
-// pixel_dispatch → feedback_ctrl
+// pixel_dispatch -> feedback_ctrl
 logic [10:0] x_pixel;
 logic [9:0]  y_pixel;
 logic        valid;
 logic [19:0] pix_id;
 
-// Vincent → feedback_ctrl (feedback path)
+// Vincent -> feedback_ctrl (feedback path)
 logic [19:0] fb_pix_id;
 logic [31:0] fb_pos_x;
 logic [31:0] fb_pos_y;
@@ -36,42 +36,41 @@ logic [31:0] fb_ray_dir_z;
 logic [7:0]  fb_iteration_count;
 logic        fb_validity;
 
-// Jai → feedback_ctrl
+// Jai -> feedback_ctrl
 logic        pipeline_ready;
 
-// feedback_ctrl → Vincent
+// feedback_ctrl -> Vincent
 logic [10:0] out_x;
 logic [9:0]  out_y;
 logic [19:0] out_pix_id;
-logic [31:0] out_pos_x;
-logic [31:0] out_pos_y;
-logic [31:0] out_pos_z;
-logic [31:0] out_ray_dir_x;
-logic [31:0] out_ray_dir_y;
-logic [31:0] out_ray_dir_z;
+logic [26:0] out_pos_x;
+logic [26:0] out_pos_y;
+logic [26:0] out_pos_z;
+logic [26:0] out_ray_dir_x;
+logic [26:0] out_ray_dir_y;
+logic [26:0] out_ray_dir_z;
 logic [7:0]  out_iteration_count;
 logic        out_validity;
 logic        stall;
 
-// Vincent → fb_write
+// Vincent -> fb_write
 logic [19:0] done_pix_id;
 logic        pix_done;
 logic        hit;
 
-// Sakthi Colour Stuff → fb_write
+// Sakthi Colour Stuff -> fb_write
 logic [23:0] rgb;
-logic        rgb_valid;
 
-// fb_write → BRAM
+// fb_write -> BRAM
 logic [19:0] bram_addr;
 logic [23:0] bram_data_in;
 logic        bram_we;
 
-// BRAM stub
-logic [23:0] bram [0:921599];
+// BRAM
+logic [23:0] bram [0:230399];
 
 // Seen array for checking
-logic        seen [0:921599];
+logic        seen [0:230399];
 integer      counter;
 
 // Module instantiations
@@ -123,7 +122,6 @@ fb_write fb_write_inst (
     .pix_done(pix_done),
     .hit(hit),
     .rgb(rgb),
-    .rgb_valid(rgb_valid),
     .bram_addr(bram_addr),
     .bram_data_in(bram_data_in),
     .bram_we(bram_we)
@@ -139,10 +137,9 @@ initial begin
     $dumpvars(0, integration_tb);
 end
 
-// Sakthi Colours Stuff (adding random inputs)
+// Sakthi
 always @(posedge clk) begin
-    rgb_valid <= pix_done;
-    rgb       <= 24'hFF0000;
+    rgb <= 24'hFF0000;
 end
 
 // BRAM write and seen tracking
@@ -155,24 +152,22 @@ end
 
 // Stimulus
 initial begin
-    // Initialise all inputs to 0
-    pipeline_ready     = 0;
-    fb_validity        = 0;
-    fb_pix_id          = 0;
-    fb_pos_x           = 0;
-    fb_pos_y           = 0;
-    fb_pos_z           = 0;
-    fb_ray_dir_x       = 0;
-    fb_ray_dir_y       = 0;
-    fb_ray_dir_z       = 0;
-    fb_iteration_count = 0;
-    pix_done           = 0;
-    hit                = 0;
-    done_pix_id        = 0;
-    rgb                = 0;
-    rgb_valid          = 0;
+    pipeline_ready     = 1'b0;
+    fb_validity        = 1'b0;
+    fb_pix_id          = 20'd0;
+    fb_pos_x           = 32'd0;
+    fb_pos_y           = 32'd0;
+    fb_pos_z           = 32'd0;
+    fb_ray_dir_x       = 32'd0;
+    fb_ray_dir_y       = 32'd0;
+    fb_ray_dir_z       = 32'd0;
+    fb_iteration_count = 8'd0;
+    pix_done           = 1'b0;
+    hit                = 1'b0;
+    done_pix_id        = 20'd0;
+    rgb                = 24'd0;
 
-    for (counter = 0; counter <= 921599; counter = counter + 1)
+    for (counter = 0; counter <= 230399; counter = counter + 1)
         seen[counter] = 0;
 
     rst = 1'b1;
@@ -180,7 +175,7 @@ initial begin
     @(posedge clk);
     rst = 1'b0;
 
-    pipeline_ready = 1;
+    pipeline_ready = 1'b1;
 
     // TODO: Add Vincent stub here when ready
     // feedback_ctrl sends out_pix_id, out_pos, out_ray and out_iter to Vincent
@@ -191,7 +186,7 @@ initial begin
     repeat(2000000) @(posedge clk);
 
     // Final check
-    for (counter = 0; counter <= 921599; counter = counter + 1) begin
+    for (counter = 0; counter <= 230399; counter = counter + 1) begin
         if (!seen[counter])
             $display("Error: pixel %0d never written to BRAM", counter);
     end

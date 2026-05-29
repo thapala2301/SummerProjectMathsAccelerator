@@ -23,12 +23,12 @@ logic        pipeline_ready;
 logic [10:0] out_x;
 logic [9:0]  out_y;
 logic [19:0] out_pix_id;
-logic [31:0] out_pos_x;
-logic [31:0] out_pos_y;
-logic [31:0] out_pos_z;
-logic [31:0] out_ray_dir_x;
-logic [31:0] out_ray_dir_y;
-logic [31:0] out_ray_dir_z;
+logic [26:0] out_pos_x;
+logic [26:0] out_pos_y;
+logic [26:0] out_pos_z;
+logic [26:0] out_ray_dir_x;
+logic [26:0] out_ray_dir_y;
+logic [26:0] out_ray_dir_z;
 logic [7:0]  out_iteration_count;
 logic        out_validity;
 

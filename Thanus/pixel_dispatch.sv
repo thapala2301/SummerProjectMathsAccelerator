@@ -9,7 +9,7 @@ module pixel_dispatch(
     output logic [19:0] pix_id
 );
 
-assign pix_id = (y_pixel * 1280) + x_pixel;
+assign pix_id = ((y_pixel >> 1) * 640) + (x_pixel >> 1);
 assign valid  = ~rst & pipeline_ready;
 
 always_ff @(posedge clk) begin
