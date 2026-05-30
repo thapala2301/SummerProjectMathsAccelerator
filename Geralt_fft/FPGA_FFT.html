@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zynq Hardware-Accelerated FFT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green:       #00ff88;
+            --green-dim:   #00c86644;
+            --green-glow:  #00ff8888;
+            --amber:       #ffb300;
+            --bg:          #080c0a;
+            --panel:       #0d1410;
+            --border:      #1a2e22;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: var(--bg);
+            color: var(--green);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 20px 40px;
+            overflow-x: hidden;
+        }
+
+        /* scanline overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,255,136,0.015) 2px,
+                rgba(0,255,136,0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* ── header ── */
+        header {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 14px;
+            margin-bottom: 28px;
+        }
+
+        .logo-block { display: flex; flex-direction: column; gap: 2px; }
+
+        .logo-block .brand {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.55rem;
+            letter-spacing: 0.12em;
+            color: var(--green);
+            text-shadow: 0 0 18px var(--green-glow);
+        }
+
+        .logo-block .sub {
+            font-size: 0.68rem;
+            color: #3a6e50;
+            letter-spacing: 0.18em;
+        }
+
+        .status-cluster { display: flex; align-items: center; gap: 14px; font-size: 0.72rem; color: #3a6e50; }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #333;
+            box-shadow: none;
+            transition: background 0.4s, box-shadow 0.4s;
+        }
+        .status-dot.live {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0.4; }
+        }
+
+        .ip-tag {
+            color: #2a5c3a;
+            letter-spacing: 0.08em;
+        }
+
+        /* ── controls panel ── */
+        .controls {
+            width: 100%;
+            max-width: 1100px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .file-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            flex: 1;
+            min-width: 220px;
+        }
+        .file-label:hover { border-color: var(--green); background: #111b14; }
+
+        .file-label input { display: none; }
+
+        .file-icon { color: var(--green); font-size: 1rem; }
+
+        #fileName {
+            font-size: 0.75rem;
+            color: #4a7a5a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 260px;
+        }
+
+        #playBtn {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            background: transparent;
+            color: var(--green);
+            border: 1px solid var(--green);
+            border-radius: 4px;
+            padding: 9px 22px;
+            cursor: pointer;
+            transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+            white-space: nowrap;
+        }
+        #playBtn:hover {
+            background: var(--green);
+            color: #000;
+            box-shadow: 0 0 18px var(--green-glow);
+        }
+        #playBtn:disabled { opacity: 0.35; cursor: default; }
+
+        .meta { font-size: 0.68rem; color: #2e5a3e; margin-left: auto; line-height: 1.6; text-align: right; }
+
+        audio { display: none; }
+
+        /* ── canvas wrapper ── */
+        .canvas-wrap {
+            width: 100%;
+            max-width: 1100px;
+            position: relative;
+        }
+
+        .canvas-wrap canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 0 32px #00ff4422, inset 0 0 60px #00000088;
+        }
+
+        /* freq axis labels rendered over canvas */
+        .freq-axis {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 28px;
+            pointer-events: none;
+        }
+
+        /* ── peak readout ── */
+        #peakReadout {
+            margin-top: 12px;
+            font-size: 0.72rem;
+            color: #3a6e50;
+            letter-spacing: 0.1em;
+            height: 18px;
+        }
+        #peakReadout span { color: var(--amber); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo-block">
+        <div class="brand">ZYNQ FFT ANALYSER</div>
+        <div class="sub">HARDWARE-ACCELERATED · REAL-TIME SPECTRUM</div>
+    </div>
+    <div class="status-cluster">
+        <div class="status-dot" id="wsDot"></div>
+        <div id="wsLabel">DISCONNECTED</div>
+        <div class="ip-tag">// 192.168.137.49</div>
+    </div>
+</header>
+
+<div class="controls">
+    <label class="file-label">
+        <span class="file-icon">▶</span>
+        <input type="file" id="audioUpload" accept="audio/*">
+        <span id="fileName">no file selected</span>
+    </label>
+
+    <button id="playBtn">PLAY &amp; SEND TO FPGA</button>
+
+    <audio id="audioPlayer"></audio>
+
+    <div class="meta" id="metaBox">
+        SAMPLE RATE — —<br>
+        FFT SIZE &nbsp;&nbsp;— —
+    </div>
+</div>
+
+<div class="canvas-wrap">
+    <canvas id="spectrumCanvas" width="1100" height="420"></canvas>
+</div>
+
+<div id="peakReadout">PEAK — — — Hz &nbsp;|&nbsp; — — — dB</div>
+
+<script>
+// ─── config ──────────────────────────────────────────────
+// SAMPLE_RATE is set dynamically once AudioContext is created.
+// Hardcoding 44100 caused ~9% freq shift when browser runs at 48000 Hz.
+const FFT_SIZE    = 1024;
+const USABLE_BINS = FFT_SIZE / 2;   // 512 real bins (0 → Nyquist)
+const MIN_FREQ    = 20;
+const MAX_FREQ    = 20000;
+const SMOOTHING   = 0.55;
+const DB_MAX      =  70;    // top of canvas — 70 dB = loudest signal
+const DB_MIN      =   0;    // bottom of canvas — 0 dB = noise floor / silence
+const DECAY_DB    = 0.15;
+
+// ─── DOM refs ────────────────────────────────────────────
+const canvas      = document.getElementById('spectrumCanvas');
+const ctx         = canvas.getContext('2d');
+const audioUpload = document.getElementById('audioUpload');
+const playBtn     = document.getElementById('playBtn');
+const audioPlayer = document.getElementById('audioPlayer');
+const fileName    = document.getElementById('fileName');
+const metaBox     = document.getElementById('metaBox');
+const wsDot       = document.getElementById('wsDot');
+const wsLabel     = document.getElementById('wsLabel');
+const peakReadout = document.getElementById('peakReadout');
+
+const W = canvas.width;
+const H = canvas.height;
+const AXIS_H = 30;
+const PLOT_H = H - AXIS_H;
+
+// ─── state ───────────────────────────────────────────────
+// smoothed & peakHold now store dB values (DB_MIN … DB_MAX)
+let smoothed         = new Float32Array(W).fill(0);
+let peakHold         = new Float32Array(W).fill(0);
+let audioContext, source;
+let actualSampleRate = 48000;   // updated when AudioContext starts
+
+// ─── WebSocket ───────────────────────────────────────────
+const ws = new WebSocket('ws://192.168.137.49:8765');
+
+ws.onopen  = () => { wsDot.classList.add('live');    wsLabel.textContent = 'LIVE'; };
+ws.onclose = () => { wsDot.classList.remove('live'); wsLabel.textContent = 'DISCONNECTED'; };
+ws.onerror = () => { wsLabel.textContent = 'ERROR'; };
+
+// ─── file picker ─────────────────────────────────────────
+audioUpload.addEventListener('change', () => {
+    const f = audioUpload.files[0];
+    if (!f) return;
+    fileName.textContent = f.name;
+    audioPlayer.src = URL.createObjectURL(f);
+});
+
+// ─── AudioWorklet source (blob) ──────────────────────────
+// Replaces deprecated ScriptProcessor — runs on the audio thread,
+// eliminating the timing jitter that caused harmonic distortion.
+const workletSrc = `
+class PCMSender extends AudioWorkletProcessor {
+    constructor() { super(); this._buf = []; }
+    process(inputs) {
+        const ch = inputs[0][0];
+        if (!ch) return true;
+        for (let i = 0; i < ch.length; i++) this._buf.push(ch[i]);
+        while (this._buf.length >= ${FFT_SIZE}) {
+            const chunk = new Float32Array(this._buf.splice(0, ${FFT_SIZE}));
+            this.port.postMessage(chunk.buffer, [chunk.buffer]);
+        }
+        return true;
+    }
+}
+registerProcessor('pcm-sender', PCMSender);
+`;
+
+// ─── play button ─────────────────────────────────────────
+playBtn.addEventListener('click', async () => {
+    if (!audioUpload.files[0]) { alert('Select an audio file first.'); return; }
+
+    audioPlayer.play();
+
+    if (!audioContext) {
+        audioContext     = new (window.AudioContext || window.webkitAudioContext)();
+        actualSampleRate = audioContext.sampleRate;   // ← correct for this browser
+
+        metaBox.innerHTML =
+            `SAMPLE RATE ${actualSampleRate} Hz<br>` +
+            `FFT SIZE &nbsp;&nbsp;${FFT_SIZE} pts`;
+
+        const blob    = new Blob([workletSrc], { type: 'application/javascript' });
+        const blobURL = URL.createObjectURL(blob);
+        await audioContext.audioWorklet.addModule(blobURL);
+
+        source = audioContext.createMediaElementSource(audioPlayer);
+        const workletNode = new AudioWorkletNode(audioContext, 'pcm-sender');
+
+        workletNode.port.onmessage = (e) => {
+            if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
+        };
+
+        source.connect(workletNode);
+        source.connect(audioContext.destination);
+        // workletNode intentionally NOT connected to destination (tap only)
+    }
+});
+
+// ─── log → linear bin mapping ────────────────────────────
+function freqForPixel(x) {
+    return MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, x / W);
+}
+
+// Returns the RANGE of bins that map to pixel x (for averaging)
+function binRangeForPixel(x) {
+    const f0 = freqForPixel(x);
+    const f1 = freqForPixel(x + 1);
+    const b0 = Math.max(0,           Math.round((f0 / actualSampleRate) * FFT_SIZE));
+    const b1 = Math.min(USABLE_BINS - 1, Math.round((f1 / actualSampleRate) * FFT_SIZE));
+    return [b0, Math.max(b0, b1)];
+}
+
+// ─── helpers ─────────────────────────────────────────────
+function dbToY(db) {
+    return PLOT_H * (1 - (db - DB_MIN) / (DB_MAX - DB_MIN));
+}
+
+// ─── stable reference calibration ────────────────────────
+// DB_REF_dynamic = the noise floor (minimum non-zero power seen).
+// powToDb then gives 0 dB for silence and positive dB for louder signals.
+let DB_REF_dynamic = Infinity;
+let refReady = false;
+
+function updateRef(data) {
+    // Track the running minimum across all bins (ignoring bin 0 = DC)
+    for (let i = 1; i < data.length; i++) {
+        if (data[i] > 0 && data[i] < DB_REF_dynamic) {
+            DB_REF_dynamic = data[i];
+            refReady = true;
+        }
+    }
+}
+
+function powToDb(p) {
+    if (!refReady || p <= 0) return DB_MIN;
+    // Positive = louder than noise floor, 0 = at noise floor
+    return Math.max(DB_MIN, 10 * Math.log10(p / DB_REF_dynamic));
+}
+
+// ─── draw ────────────────────────────────────────────────
+function drawSpectrum(data) {
+    updateRef(data);
+    if (!refReady) return;
+
+    ctx.clearRect(0, 0, W, H);
+    drawGrid();
+
+    // Find true peak BIN for accurate frequency readout
+    let peakBin = 1, peakBinPow = 0;
+    for (let b = 1; b < USABLE_BINS && b < data.length; b++) {
+        if (data[b] > peakBinPow) { peakBinPow = data[b]; peakBin = b; }
+    }
+    const peakFreqHz = (peakBin / FFT_SIZE) * actualSampleRate;
+    const peakDbVal  = powToDb(peakBinPow);
+
+    for (let x = 0; x < W; x++) {
+        const [b0, b1] = binRangeForPixel(x);
+        if (b0 >= data.length) continue;
+
+        let sum = 0, count = 0;
+        for (let b = b0; b <= b1 && b < data.length; b++) { sum += data[b]; count++; }
+
+        const rawDb     = powToDb(sum / Math.max(1, count));
+        const clampedDb = Math.max(DB_MIN, Math.min(DB_MAX, rawDb));
+
+        smoothed[x] = clampedDb * (1 - SMOOTHING) + smoothed[x] * SMOOTHING;
+
+        if (smoothed[x] > peakHold[x]) peakHold[x] = smoothed[x];
+        else peakHold[x] = Math.max(DB_MIN, peakHold[x] - DECAY_DB);
+
+        const yTop = dbToY(smoothed[x]);
+        const barH = PLOT_H - yTop;
+        if (barH <= 0) continue;
+
+        const grad = ctx.createLinearGradient(0, yTop, 0, PLOT_H);
+        grad.addColorStop(0,   '#00ff88');
+        grad.addColorStop(0.5, '#00cc66');
+        grad.addColorStop(1,   '#003322');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, yTop, 1, barH);
+
+        const yPeak = Math.max(0, dbToY(peakHold[x]));
+        ctx.fillStyle = '#ffb300cc';
+        ctx.fillRect(x, yPeak, 1, 2);
+    }
+
+    drawFreqAxis();
+
+    // ── Debug overlay — remove once calibration is confirmed correct
+    const rawMax = Math.max(...data.slice(0, USABLE_BINS));
+    const rawMin = Math.min(...data.slice(0, USABLE_BINS));
+    ctx.fillStyle = '#ffff0099';
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`RAW max=${rawMax.toExponential(2)}  min=${rawMin.toExponential(2)}  REF=${DB_REF_dynamic.toExponential(2)}`, 8, 16);
+
+    peakReadout.innerHTML =
+        `PEAK &nbsp;<span>${freqLabel(peakFreqHz)}</span> &nbsp;|&nbsp; <span>${peakDbVal.toFixed(1)} dB</span>`;
+}
+
+function drawGrid() {
+    ctx.lineWidth = 1;
+
+    const dbStep = 10;
+    for (let db = DB_MIN; db <= DB_MAX; db += dbStep) {
+        const y = Math.round(dbToY(db));
+        ctx.strokeStyle = db === 0 ? '#1e4030' : '#0d2015';
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+
+        ctx.fillStyle = '#2a5c3a';
+        ctx.font = '9px "Share Tech Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${db} dB`, 4, y - 2);
+    }
+
+    ctx.strokeStyle = '#0d2015';
+    const guides = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    guides.forEach(freq => {
+        const x = Math.round(W * Math.log(freq / MIN_FREQ) / Math.log(MAX_FREQ / MIN_FREQ));
+        if (x < 0 || x > W) return;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, PLOT_H); ctx.stroke();
+    });
+}
+
+function drawFreqAxis() {
+    // axis background strip
+    ctx.fillStyle = '#080c0a';
+    ctx.fillRect(0, PLOT_H, W, AXIS_H);
+
+    ctx.strokeStyle = '#1a2e22';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, PLOT_H); ctx.lineTo(W, PLOT_H);
+    ctx.stroke();
+
+    ctx.fillStyle = '#3a6e50';
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+
+    const labels = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    labels.forEach(freq => {
+        const x = Math.round(W * Math.log(freq / MIN_FREQ) / Math.log(MAX_FREQ / MIN_FREQ));
+        if (x < 10 || x > W - 10) return;
+
+        // tick
+        ctx.strokeStyle = '#2a5c3a';
+        ctx.beginPath();
+        ctx.moveTo(x, PLOT_H); ctx.lineTo(x, PLOT_H + 5);
+        ctx.stroke();
+
+        // label
+        ctx.fillText(freqLabel(freq), x, PLOT_H + 20);
+    });
+}
+
+function freqLabel(hz) {
+    if (hz >= 1000) return (hz / 1000).toFixed(hz >= 10000 ? 0 : 1) + 'k';
+    return Math.round(hz) + '';
+}
+
+// ─── render loop ─────────────────────────────────────────
+// pendingData holds the latest FFT array from WS, or null for idle.
+let pendingData = null;
+let frameCount  = 0;
+
+ws.onmessage = (event) => {
+    try {
+        const d = JSON.parse(event.data);
+        // Log the first 3 frames so we can see actual FPGA values in DevTools
+        if (frameCount < 3) {
+            const sorted = [...d].sort((a,b) => b - a);
+            console.log(`[FFT frame ${frameCount}] len=${d.length} | max=${sorted[0].toExponential(3)} | min=${sorted[sorted.length-1].toExponential(3)} | top10:`, sorted.slice(0,10).map(v=>v.toExponential(2)));
+            frameCount++;
+        }
+        pendingData = d;
+    } catch(e) { console.warn('Bad WS payload', e); }
+};
+
+function renderLoop() {
+    requestAnimationFrame(renderLoop);
+
+    if (pendingData) {
+        // Real spectrum data available — draw it and consume
+        drawSpectrum(pendingData);
+        pendingData = null;
+    } else {
+        // Idle: draw quiet noise floor so canvas isn't blank
+        ctx.clearRect(0, 0, W, H);
+        drawGrid();
+        for (let x = 0; x < W; x++) {
+            const h = Math.random() * 2 + 1;
+            ctx.fillStyle = '#003322';
+            ctx.fillRect(x, PLOT_H - h, 1, h);
+        }
+        drawFreqAxis();
+    }
+}
+
+renderLoop();
+</script>
+</body>
+</html>
