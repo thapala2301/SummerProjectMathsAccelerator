@@ -1,0 +1,81 @@
+13:31
+https://claude.ai/share/f8280550-6d00-4e38-8817-2d02dc9478df
+
+ 
+Role 1 — Pixel controller THANUS
+This person owns the sequencing brain of the entire pipeline. Their job is to know, at every clock cycle, which pixel should be entering the pipeline next. On startup they iterate through every pixel coordinate from (0,0) to (1279,719) in raster order, emitting one pixel per cycle into ray_gen. But the more complex part of their job is the feedback path — when march_core signals that a pixel has not converged (hit=0, not escaped, iterations not exhausted), that pixel needs to go around again with its accumulated depth state. The pixel controller must decide whether to inject a returning pixel or a fresh pixel into the pipeline, and manage that arbitration without stalling.
+They also own the framebuffer write side — taking the RGB output from iter_to_rgb and writing it to the correct BRAM address using the pix_id to compute the address.
+Deliverables:
+• pixel_dispatch.v — raster scan sequencer with backpressure support
+• feedback_ctrl.v — arbitration logic between new pixels and returning pixels
+• fb_write.v — BRAM write controller, pix_id to address mapping
+• A testbench that verifies every pixel ID from 0 to (WIDTH*HEIGHT-1) is eventually emitted, and that feedback pixels are correctly re-injected
+• Verified in simulation: no pixel is dropped, no pixel is duplicated
+ 
+Role 2 — Ray generator JAI
+This person owns the mathematical transformation from a 2D pixel coordinate to a 3D ray in world space. The core computation is: subtract the screen centre from the pixel coordinate, construct the unnormalized direction vector using a precomputed FOV constant for the Z component, normalize it, then multiply by the lookat matrix to orient the camera. Every one of these steps is a fixed-point operation — subtraction, multiply, normalization (which requires a square root), and a 3x3 matrix multiply.
+The lookat matrix nine coefficients come in as AXI-lite registers written by the PS. This person owns that register interface too — instantiating the AXI-lite slave and latching the matrix values.
+The entire module is a fixed pipeline. No feedback, no iteration. A pixel coordinate goes in, a ray comes out N cycles later. They must document exactly what N is so march_core can pipeline pix_id correctly.
+Deliverables:
+• ray_gen.v — full pixel-to-ray pipeline
+• axi_camera_regs.v — AXI-lite slave exposing lookat matrix and camera origin as memory-mapped registers
+• A testbench that feeds known pixel coordinates and checks output ray directions against the software reference implementation. At minimum test the four corners and the screen centre.
+• Documented pipeline latency in cycles
+• Verified: output rays are unit length within fixed-point tolerance
+ 
+Role 3 — SDF evaluator - Marching loop VINCENT
+ 
+This person owns the Menger sponge distance function entirely. The Menger sponge SDF works by repeatedly folding space — you take a point, apply modulo to repeat it in a grid, take the absolute value to mirror it, scale it, and repeat this fold operation several times before evaluating a simple box SDF on the result. Each fold iteration makes the fractal one level deeper.
+Every fold is a sequence of fixed-point operations: mod (implemented as subtraction after a floor), abs, multiply by a scale constant. These are fully pipelineable — no data-dependent branching. The number of fold iterations is a parameter that trades detail for resource usage.
+This module is a pure function. It receives a 3D point and returns a scalar distance. It has no knowledge of rays, cameras, or iterations. This purity is what makes it independently testable from Day 1 — feed it points, check distances against the software SDF.
+The critical output is the LATENCY parameter — the exact number of cycles from input valid to output valid. This number must be stable and documented because march_core pipelines all its state registers to match it.
+Deliverables:
+• menger_sdf.v — parameterized by fold count, fully pipelined
+• sdf_fold_stage.v — single fold iteration as a standalone module, instantiated N times
+• A testbench that sweeps a grid of 3D points and diffs output distances against the Python software reference, checking within fixed-point tolerance
+• Documented LATENCY value for each fold count configuration
+• Verified: distance field is correct for points inside, outside, and exactly on the surface
+•  
+This person owns the iteration controller — the logic that takes a ray, repeatedly queries the SDF, steps forward, and decides whether the ray has hit the surface, escaped to infinity, or needs another step.
+The core loop in software is simple — evaluate SDF, if dist < epsilon then hit, else advance point by dist along ray direction, repeat. In hardware this is not a loop at all — it is a pipeline stage that the pixel controller feeds pixels through repeatedly. Each time a pixel passes through, march_core does one iteration: it sends the current point to the SDF evaluator, waits the SDF latency cycles for the result, then either signals done+hit, signals done+miss, or signals feedback to go around again.
+The hardest part of this module is keeping all the per-pixel state — current position, accumulated depth, ray direction, iteration count — correctly pipelined through the SDF latency. Since the SDF takes N cycles to respond, march_core must delay all associated state by exactly N cycles using shift registers, and correctly match returning SDF results to the pixel they belong to using pix_id.
+Deliverables:
+• march_core.v — single iteration stage, parameterized by SDF_LATENCY
+• state_pipe.v — generic shift register for delaying per-pixel state, parameterized by WIDTH and DEPTH. This is the pipeline register infrastructure used throughout the module.
+• A testbench using a stubbed SDF (returns a hardcoded constant distance) that verifies hit detection, escape detection, depth accumulation, and feedback signalling all work correctly in isolation
+• Verified: with the real menger_sdf substituted, output iteration counts match the software reference for a set of known rays
+•  
+ 
+Role 4 — FFT GERALT
+ 
+Role 5 — Color mapping + HDMI output SAKTHI
+This person owns two things that are naturally coupled: converting the marching loop's iteration count into an RGB color, and driving those colors to the HDMI output in correct scan order.
+The color mapping is the creative part — the blue-to-purple-to-red gradient in the target image comes from mapping iteration count through different bit-shift offsets per channel, as described in the paper. This person owns that mapping and has latitude to tune it. It is a combinational or single-cycle module.
+The HDMI side is the more demanding engineering work. They need to generate correct 1280x720p60 timing — hsync, vsync, active video window, and a 74.25 MHz pixel clock. The PYNQ-Z1 has HDMI output via the PL using Digilent's RGB2DVI IP or a similar TMDS encoder. This person integrates that IP, drives it with correct timing signals, and reads pixels from the framebuffer BRAM in scan-line order at the pixel clock rate.
+The framebuffer is a dual-port BRAM — they own port B (read-only), the pixel controller owns port A (write). They must handle the case where the ray marcher hasn't finished a frame yet — typically by displaying the previous completed frame while the new one renders.
+Deliverables:
+• iter_to_rgb.v — iteration count to 24-bit RGB, parameterized shift amounts per channel
+• hdmi_timing.v — 1280x720p60 sync signal generator
+• scan_out.v — reads BRAM at scan position and feeds pixel data to HDMI IP
+• framebuffer_bram.v — BRAM instantiation configured as true dual-port, 1280x720 x 24-bit
+• Integration of Digilent RGB2DVI or equivalent TMDS IP in the Vivado block design
+• A testbench that verifies hsync/vsync timing matches the 720p60 specification exactly
+• Verified on hardware: stable image on monitor with a hardcoded test pattern before any ray marcher connection
+ 
+Role 6 — Software Implementation CHARLIE
+This person never writes a ray marching module. Their job is to own the Vivado block design and the glue that connects everything together — both within the PL and between the PL and the PS.
+From Day 1 they build the top-level block design skeleton: PS7 block, AXI interconnect, clock wizard producing the pixel clock and system clock, and empty placeholder ports for every other role's module. They own the constraint file — pin assignments for HDMI, timing constraints for each clock domain. They are the person who runs Vivado implementation and checks timing closure.
+They also own the PS-side C or Python driver that writes the lookat matrix over AXI, triggers rendering, and can read back a pixel for verification. This is the interface the team uses to test end-to-end before everything is working — write a camera matrix, check that a known pixel comes out the right color.
+Their job gets progressively more real as other roles deliver modules — they drop each one into the block design, wire it up, run synthesis, check resource usage and timing. On Day 5 they are the integration lead.
+Deliverables:
+• Vivado block design with all modules connected and constraints closed
+• top.v — top-level wrapper instantiating all pipeline modules
+• xdc constraints file — HDMI pin assignments, clock constraints, timing exceptions
+• PS-side driver in C or Python: writes camera registers over AXI-lite, reads a framebuffer pixel back for spot-checking
+• Resource utilization report at each integration milestone showing LUT, FF, DSP, BRAM usage
+• Timing closure report — all paths meeting constraints at target clock frequency
+• End-to-end test: camera matrix written from PS, Menger sponge visible on HDMI monitor
+ 
+ 
+ 
+ 
