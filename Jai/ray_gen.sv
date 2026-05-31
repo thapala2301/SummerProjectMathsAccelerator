@@ -7,16 +7,17 @@ module ray_gen #(
     parameter int PIX_ID_W = 20,
     parameter logic [26:0] FOV_Z_CONST = 27'h1FC0000
 ) (
-    input logic clk,
-    input logic rst_n,
+    input wire logic clk,
+    input wire logic rst_n,
 
-    input logic [10:0] pix_x,
-    input logic [9:0] pix_y,
-    input logic [PIX_ID_W-1:0] pix_id_in,
-    input logic valid_in,
+    input wire logic [10:0] pix_x,
+    input wire logic [9:0] pix_y,
+    input wire logic [PIX_ID_W-1:0] pix_id_in,
+    input wire logic valid_in,
 
-    input logic [26:0] lookat [0:8],
-    input logic [26:0] cam_origin [0:2],
+    input wire logic [26:0] lookat [0:8],
+    input wire logic [26:0] cam_origin [0:2],
+
 
     output logic [26:0] ray_orig [0:2],
     output logic [26:0] ray_dir [0:2],
@@ -341,3 +342,6 @@ module ray_gen #(
     initial $display("ray_gen PIPE_LATENCY = %0d", PIPE_LATENCY);
 
 endmodule
+
+
+`default_nettype wire //otherwise error bleed

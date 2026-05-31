@@ -186,7 +186,7 @@ framebuffer_bram inst1_bram(
     .doutb(bram_doutb)
 );
 
-rgb2dvi inst1_rgb2dvi(
+rgb2dvi_0 inst1_rgb2dvi(
     .PixelClk(clk_pixel),
     .aRst(rst),
     .vid_pData(hdmi_rgb), 
