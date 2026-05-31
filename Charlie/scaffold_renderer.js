@@ -20,11 +20,6 @@ uniform vec3 uCameraPosition;
 uniform mat3 uCameraMatrix;
 uniform float uFovDegrees;
 
-mat2 rot2D(float a) {
-    float s = sin(a), c = cos(a);
-    return mat2(c, -s, s, c);
-}
-
 float sdBoxFrame(vec3 p, vec3 b, float e) {
     p = abs(p) - b;
     vec3 q = abs(p + e) - e;
@@ -35,7 +30,7 @@ float sdBoxFrame(vec3 p, vec3 b, float e) {
         length(max(vec3(q.x, q.y, p.z), 0.0)) + min(max(q.x, max(q.y, p.z)), 0.0));
 }
 
-float map(vec3 p) {
+float mapScene(vec3 p) {
     float c = 10.0;
     vec3 q = mod(p + 0.5 * c, c) - 0.5 * c;
     float wobbleFreq = 15.0;
@@ -57,7 +52,7 @@ void main() {
     int i;
 
     for (i = 0; i < 128; i++) {
-        float d = map(rayOrigin + rayDir * t);
+        float d = mapScene(rayOrigin + rayDir * t);
         t += d;
         if (d < 0.001 || t > 200.0) break;
     }
