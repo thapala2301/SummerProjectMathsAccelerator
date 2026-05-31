@@ -186,7 +186,18 @@ framebuffer_bram inst1_bram(
     .doutb(bram_doutb)
 );
 
-
+rgb2dvi inst1_rgb2dvi(
+    .PixelClk(clk_pixel),
+    .aRst(rst),
+    .vid_pData(hdmi_rgb), 
+    .vid_pHSync(hdmi_hsync),
+    .vid_pVSync(hdmi_vsync),
+    .vid_pVDE(hdmi_active),
+    .TMDS_Clk_p(hdmi_tx_clk_p),
+    .TMDS_Clk_n(hdmi_tx_clk_n),
+    .TMDS_Data_p(hdmi_tx_data_p),
+    .TMDS_Data_n(hdmi_tx_data_n)
+);
 
 
 
