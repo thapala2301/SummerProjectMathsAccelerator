@@ -33,8 +33,10 @@ module axi_camera_regs #(
     output logic [26:0] cam_origin [0:2]
 );
 
+    // 1.0:  sign=0, exp=127=0x7F, frac=0  -> {1'b0, 8'h7F, 18'h0} = 27'h1FC0000
+    // -1.0: sign=1, exp=127=0x7F, frac=0  -> {1'b1, 8'h7F, 18'h0} = 27'h5FC0000
     localparam logic [26:0] FP_ONE = 27'h1FC0000;
-    localparam logic [26:0] FP_NEG_ONE = 27'h3FC0000;
+    localparam logic [26:0] FP_NEG_ONE = 27'h5FC0000;
 
     logic [DATA_W-1:0] regfile [0:11];
 
