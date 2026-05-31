@@ -1,0 +1,2 @@
+set_property ip_repo_paths {/Users/vincent/ICL/year2/RayMarcherEOYProject/SummerProjectMathsAccelerator/VivadoDesigns/ip_catalog/vivado-library-master/ip} [current_project]
+update_ip_catalog
