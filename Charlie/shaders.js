@@ -21,7 +21,6 @@ out vec4 outColour;
 uniform vec2 uResolution;
 uniform vec3 uCameraPosition;
 uniform mat3 uCameraMatrix;
-// Camera basis: right, up and -forward
 uniform float uFovDegrees;
 
 float sphereDE(vec3 p) {
@@ -34,7 +33,7 @@ float mapScene(vec3 p) {
 
 vec3 estimateNormal(vec3 p) {
     vec2 e = vec2(0.003, 0.0);
-    // Surface normal from central differences
+
     return normalize(vec3(
         mapScene(p + e.xyy) - mapScene(p - e.xyy),
         mapScene(p + e.yxy) - mapScene(p - e.yxy),

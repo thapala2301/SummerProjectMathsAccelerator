@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { advanceCameraState, clamp, createCameraState, resetCameraState } from "./camera.js";
-import { createCpuRenderer } from "./cpu_renderer.js";
+import { createGpuRenderer } from "./gpu_renderer.js";
 
 const LOOK_SENSITIVITY = 0.0019;
 const HUD_REFRESH_MS = 120;
@@ -35,7 +35,7 @@ export default function App() {
         }
 
         try {
-            rendererRef.current = createCpuRenderer(canvasRef.current);
+            rendererRef.current = createGpuRenderer(canvasRef.current);
         } catch (error) {
             // Show start-up failures in the overlay
             setGpuError(error instanceof Error ? error.message : "GPU renderer failed");
@@ -237,7 +237,7 @@ export default function App() {
                 {gpuError ? (
                     <div className="error-overlay">
                         <div className="error-panel">
-                            <div className="error-title">Renderer error</div>
+                            <div className="error-title">Error</div>
                             <pre>{gpuError}</pre>
                         </div>
                     </div>
