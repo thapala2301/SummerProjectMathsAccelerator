@@ -2,12 +2,12 @@
 module scene_sdf(
     input clk,
     input [26:0] px, py, pz,
-    output [26:0] dist
+    output [26:0] sdf_out
 );
 
 wire [26:0] b_fp = {1'b0, 8'd127, 18'h00000}; // 1.0
  //RESET TO 4.5 in 1.8.18 WHEN ALL WORKs
-wire [26:0] e_fp = {1'b0, 8'd122, 18'h00000}; // 0.03125
+wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD}; // 0.15
 //RESET TO 0.15 WHEN ALL WORK
 
 //b : half extent of box, e : edge thickness
@@ -51,7 +51,7 @@ sdf_term inst3_term3(.clk(clk), .vx(qx), .vy(qy), .vz(pz_intermed_d), .out(term3
 //now have stage A + B, take min of all
 wire [26:0] temp_min;
 fp_min inst1_min(.a(term1), .b(term2), .out(temp_min));
-fp_min inst2_min(.a(temp_min), .b(term3), .out(dist));
+fp_min inst2_min(.a(temp_min), .b(term3), .out(sdf_out));
 
 
 

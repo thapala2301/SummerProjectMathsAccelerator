@@ -44,7 +44,8 @@ logic rg_valid;
 localparam RG_LAT = 13; //13 clk latency in ray gen dir det
 ray_gen #(
     .IMG_W(1280),
-    .IMG_H(720)
+    .IMG_H(720),
+    .FOV_Z_CONST(27'h221A000)
 ) inst1_ray_gen (
     //inputs
     .clk(clk),
@@ -105,8 +106,10 @@ scene_sdf inst1_scene_sdf(
     .px(s1_pos_x),
     .py(s1_pos_y),
     .pz(s1_pos_z),
-    .dist(sdf_dist)
+    .sdf_out(sdf_dist)
 );
+
+//wire [26:0] sdf_dist = 27'h1FC0000; // constant 1.0
 logic [26:0] d2_pos_x, d2_pos_y, d2_pos_z, d2_dir_x, d2_dir_y, d2_dir_z;
 logic [7:0] d2_iter;
 logic [19:0] d2_pix_id;

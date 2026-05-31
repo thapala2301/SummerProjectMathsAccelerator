@@ -6,37 +6,37 @@ module fp_add(
 );
 
 //Stage 1: compare full mag, sel big small, comp shift amt
-reg [26:0] small, big;
+reg [26:0] sm, bg;
 reg [7:0] shift_amt;
 always @ (posedge clk) begin
     if (a[25:0] > b[25:0]) begin
-        small <= b;
-        big <= a;
+        sm <= b;
+        bg <= a;
         shift_amt <= a[25:18]-b[25:18];
     end
     else begin // includes same expo??
-        small <= a;
-        big <= b;
+        sm <= a;
+        bg <= b;
         shift_amt <= b[25:18]-a[25:18];
     end
 end
 
 
-//Stage 2: shift small mantisse, restore implicit 1.
+//Stage 2: shift sm mantisse, restore implicit 1.
 //need to handle state propagation logic
-reg s2_sign_big, s2_sign_small;
-reg [7:0] s2_exp_big;
-reg [18:0] mant_small, mant_big;
+reg s2_sign_bg, s2_sign_sm;
+reg [7:0] s2_exp_bg;
+reg [18:0] mant_sm, mant_bg;
 
 //latching for state prop logic
 
 
 always @(posedge clk) begin
-    s2_sign_big <= big[26];
-    s2_sign_small <= small[26];
-    s2_exp_big <= big[25:18];
-    mant_small <= {1'b1, small[17:0]}>>shift_amt;
-    mant_big <= {1'b1, big[17:0]};
+    s2_sign_bg <= bg[26];
+    s2_sign_sm <= sm[26];
+    s2_exp_bg <= bg[25:18];
+    mant_sm <= {1'b1, sm[17:0]}>>shift_amt;
+    mant_bg <= {1'b1, bg[17:0]};
 end
 
 //Stage 3: add or sub mantisse
@@ -45,14 +45,14 @@ reg s3_result_sign;
 reg [7:0] s3_exp;
 
 
-reg [19:0] mant_result; 
+reg [19:0] mant_result;
 always @ (posedge clk) begin
-    s3_exp<= s2_exp_big;
-    s3_result_sign <= s2_sign_big;
-    if (s2_sign_big == s2_sign_small)
-        mant_result <= mant_big + mant_small;
+    s3_exp<= s2_exp_bg;
+    s3_result_sign <= s2_sign_bg;
+    if (s2_sign_bg == s2_sign_sm)
+        mant_result <= mant_bg + mant_sm;
     else
-        mant_result <= mant_big - mant_small;
+        mant_result <= mant_bg - mant_sm;
 end
 
 //Stage 4: renormalize assemble output + if underflow : priority encoder

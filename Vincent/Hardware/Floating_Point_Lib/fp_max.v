@@ -8,6 +8,6 @@ module fp_max(
 //clean mux better than comb block w regs
 assign out = (a[26]==1'b0 && b[26]==1'b0) ? (a[25:0]<b[25:0] ? b : a) :
              (a[26]==1'b1 && b[26]==1'b1) ? (a[25:0]<b[25:0] ? a : b) :
-             (a[26]==1'b1) ? a : b;
+             (a[26]==1'b1) ? b : a;
 
 endmodule
