@@ -130,15 +130,19 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../Vincent/Hardware/scene_sdf.v">
+      <File Path="$PSRCDIR/sources_1/imports/Hardware/scene_sdf.v">
         <FileInfo>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../Vincent/Hardware/scene_sdf.v"/>
+          <Attr Name="ImportTime" Val="1780267215"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../Vincent/Hardware/sdf_term.v">
+      <File Path="$PSRCDIR/sources_1/imports/Hardware/sdf_term.v">
         <FileInfo>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../Vincent/Hardware/sdf_term.v"/>
+          <Attr Name="ImportTime" Val="1780236366"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -173,13 +177,6 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../../Sakthivel/hdmi_timing.sv">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../../Jai/isqrt_pipe.sv">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -223,6 +220,14 @@
       </File>
       <File Path="$PPRDIR/../../Vincent/Hardware/top.sv">
         <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../../Jai/isqrt_pipe.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>

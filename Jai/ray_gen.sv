@@ -47,7 +47,7 @@ module ray_gen #(
 
     localparam int HALF_W = IMG_W / 2;
     localparam int HALF_H = IMG_H / 2;
-    localparam int PIPE_LAT = 35;
+    localparam int PIPE_LAT = 36;
 
     //valid shift reg 34
     localparam int VSR_DEPTH = PIPE_LAT - 1;
@@ -84,10 +84,12 @@ module ray_gen #(
     end
 
     //s2 fp_int2fp convert int offset to 27bit float
-    wire [26:0] s2_dx_f, s2_dy_f, s2_dz_f;
-    assign s2_dz_f = s1_dz;
-    assign s2_dx_f = fp_int2fp(s1_dx[15:0]);
-    assign s2_dy_f = fp_int2fp(s1_dy[15:0]);
+    logic [26:0] s2_dx_f, s2_dy_f, s2_dz_f;
+    always_ff @(posedge clk) begin
+        s2_dx_f <= fp_int2fp(s1_dx[15:0]);
+        s2_dy_f <= fp_int2fp(s1_dy[15:0]);
+        s2_dz_f <= s1_dz;
+    end
 
     //s3 square and normalise
     wire [26:0] s3_dx2, s3_dy2, s3_dz2;
@@ -141,7 +143,7 @@ module ray_gen #(
     fp_mul norm_z(.clk(clk), .a(s6_inv_mag), .b(s6_dz_dl), .out(s7_dz));
 
     //delay lookat and origin from s0
-    localparam int DELAY = 23;
+    localparam int DELAY = 24;
     wire [26:0] lk_dl [0:8];
     wire [26:0] orig_dl [0:2];
     wire [PIX_ID_W-1:0] id_dl;
@@ -228,3 +230,5 @@ module ray_gen #(
     assign pipeline_ready = 1'b1;
 
 endmodule
+
+`default_nettype wire
