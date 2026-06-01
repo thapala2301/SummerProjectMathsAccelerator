@@ -41,7 +41,7 @@ module march_core(
 logic [26:0] rg_dir[0:2];
 logic [26:0] rg_orig[0:2];
 logic rg_valid;
-localparam RG_LAT = 13; //13 clk latency in ray gen dir det
+localparam RG_LAT = 36; //13 clk latency in ray gen dir det
 ray_gen #(
     .IMG_W(1280),
     .IMG_H(720),
@@ -99,7 +99,7 @@ assign s1_iter   = d1_iter;
 assign s1_pix_id = d1_pix_id;
 
 //Stage 2: scene_sdf, 38 clk delay pipeline
-localparam SDF_LAT=38;
+localparam SDF_LAT=39;
 logic [26:0] sdf_dist;
 scene_sdf inst1_scene_sdf(
     .clk(clk),
