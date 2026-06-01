@@ -15,22 +15,22 @@ module framebuffer_bram (
 
     (* ram_style = "block" *) logic [7:0] ram [0:460799];
 
+    initial begin
+        for (int i = 0; i < 460800; i++) begin
+            ram[i] = 8'd0;
+        end
+    end
+
     // Write
     always_ff @(posedge clka) begin
         if (wea) begin
-            if (addra < MEM_DEPTH[18:0]) begin
-                ram[addra] <= dina;
-            end
+            ram[addra] <= dina;
         end
     end
 
     // Read
     always_ff @(posedge clkb) begin
-        if (addrb < MEM_DEPTH[18:0]) begin
-            doutb <= ram[addrb];
-        end else begin
-            doutb <= 8'd0;
-        end
+        doutb <= ram[addrb];
     end
 
 endmodule

@@ -102,6 +102,19 @@ module scan_out (
         end
     end
 
+    // Colors
+    logic [23:0] mapped_rgb;
+    
+    iter_to_rgb u_color_map (
+        .iter      (bram_doutb),
+        .thresh_1  (color_thresh_1),
+        .thresh_2  (color_thresh_2),
+        .thresh_3  (color_thresh_3),
+        .shift_1   (color_shift_1),
+        .shift_2   (color_shift_2),
+        .rgb       (mapped_rgb)
+    );
+
     // Pipeline 3
     always_ff @(posedge clk_74_25) begin
         if (!rst_n) begin
@@ -121,18 +134,5 @@ module scan_out (
             end
         end
     end
-
-    // Colors
-    logic [23:0] mapped_rgb;
-    
-    iter_to_rgb u_color_map (
-        .iter      (bram_doutb),
-        .thresh_1  (color_thresh_1),
-        .thresh_2  (color_thresh_2),
-        .thresh_3  (color_thresh_3),
-        .shift_1   (color_shift_1),
-        .shift_2   (color_shift_2),
-        .rgb       (mapped_rgb)
-    );
 
 endmodule

@@ -56,6 +56,8 @@ module hdmi_timing (
             hsync <= 1'b0;
             vsync <= 1'b0;
             active_video <= 1'b0;
+            pixel_x <= 12'd0;
+            pixel_y <= 12'd0;
             end
         else begin
             if ((h_count >= H_SYNC_START) && (h_count < H_SYNC_END))
@@ -72,10 +74,9 @@ module hdmi_timing (
                 active_video <= 1'b1;
             else
                 active_video <= 1'b0;
+                
+            pixel_x <= h_count;
+            pixel_y <= v_count;
             end
-
-    // Coords
-    assign pixel_x = h_count;
-    assign pixel_y = v_count;
 
 endmodule
