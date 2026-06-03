@@ -17,7 +17,6 @@ SRCS = \
 	Floating_Point_Lib/fp_negate.v \
 	Floating_Point_Lib/int2fp.v \
 	$(ROOT)/Jai/ray_gen.sv \
-	$(ROOT)/Jai/isqrt_pipe.sv \
 	$(ROOT)/Thanus/feedback_ctrl.sv \
 	$(ROOT)/Thanus/FIFO.sv
 
