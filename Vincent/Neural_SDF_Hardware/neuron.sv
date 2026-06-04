@@ -1,6 +1,9 @@
 //simple neuron, preforms relu(w0*x + w1*y + w2*z + bias)
 //only one input per clk, so must add the bias only when the last weight is sent
 //neuron must take as parameter the number of connections it has going into it
+
+
+//note this is very simple neuron, complexify later!!!
 module neuron #(
     parameter dataWidth = 16,
     parameter actType = "relu",
@@ -10,20 +13,24 @@ module neuron #(
     (
     input logic clk,
     input logic rst,
-    input logic [dataWidth-1:0] curr_x,
-    input logic valid_curr_x,
+    input logic [dataWidth-1:0] curr_in,
+    input logic valid_curr_in,
     output logic [dataWidth-1:0] neuron_out,
     output logic out_valid
 );
 //assume neuron has weight memory inside
 logic [dataWidth-1:0] weights[0:nb_weights-1]; //store all the weights 
+initial $readmemh("weights.hex", weights);
+
+
 logic [weight_length-1:0] curr_weight_address;
 logic [dataWidth-1:0] neuron_bias;
 logic [dataWidth-1:0] result;
 logic [dataWidth-1:0] curr_sum;
 wire conn_done;
-assign conn_done = (curr_weight_address == nb_weights-1) & valid_curr_x;
+assign conn_done = (curr_weight_address == nb_weights-1) & valid_curr_in;
 initial neuron_bias = 0;
+
 always @ (posedge clk) begin
     if (rst | out_valid) begin
         curr_sum <= 0;
@@ -32,10 +39,10 @@ always @ (posedge clk) begin
     else if (valid_curr_x) begin
 
         if (curr_weight_address == nb_weights-1)
-            result <= curr_sum + weights[curr_weight_address] * curr_x + neuron_bias; //on last pass add bias
+            result <= curr_sum + weights[curr_weight_address] * curr_in + neuron_bias; //on last pass add bias
         else begin
             curr_weight_address <= curr_weight_address +1;
-            curr_sum <= curr_sum + weights[curr_weight_address] *curr_x; //weight_x tbd
+            curr_sum <= curr_sum + weights[curr_weight_address] *curr_in; //weight_x tbd
         end
     end
 
@@ -49,8 +56,6 @@ end
 
 
 neuron_ReLu inst1_ReLu(
-    .clk(clk),
-    .rst(rst),
     .in(result),
     .out(neuron_out)
 );
