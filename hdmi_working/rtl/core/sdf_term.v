@@ -19,9 +19,18 @@ module sdf_term(
 
     //second term
 
-    wire[26:0] temp_max, temp_maxv0_maxv1_v2;
+    wire[26:0] temp_max;
     fp_max inst1_max(.a(vy), .b(vz), .out(temp_max) );
-    fp_max inst2_max(.a(vx), .b(temp_max), .out(temp_maxv0_maxv1_v2));
+
+    reg [26:0] temp_max_reg;
+    reg [26:0] vx_reg;
+    always @(posedge clk) begin
+        temp_max_reg <= temp_max;
+        vx_reg <= vx;
+    end
+
+    wire [26:0] temp_maxv0_maxv1_v2;
+    fp_max inst2_max(.a(vx_reg), .b(temp_max_reg), .out(temp_maxv0_maxv1_v2));
     //clamped neg holds:max(v0,max(v1,v2)),0
 
     //second term
@@ -29,10 +38,10 @@ module sdf_term(
     wire [26:0] clamped_neg = temp_maxv0_maxv1_v2[26] ? temp_maxv0_maxv1_v2 : 27'b0;
 
 
-    //for final add must wait 22 clk for length to finish, clamped is fully comb 0 clk. 
-    //store clamped for 22 clk
+    // fp_length now 32 cycles (fp_mul=4, fp_isqrt=16, fp_add=4)
+    // clamped_neg calculation now takes 1 cycle, so pipe depth is 31 to align with len output (31 + 1 = 32)
     wire [26:0] clamped_neg_delayed;
-    state_pipe #(.WIDTH(27), .DEPTH(22)) pipe_clamped_neg(.clk(clk), .in(clamped_neg), .out(clamped_neg_delayed));
+    state_pipe #(.WIDTH(27), .DEPTH(31)) pipe_clamped_neg(.clk(clk), .in(clamped_neg), .out(clamped_neg_delayed));
     fp_add final_add (.clk(clk), .a(len), .b(clamped_neg_delayed), .out(out));
 
 endmodule

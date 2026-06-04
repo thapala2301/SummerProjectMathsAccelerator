@@ -30,3 +30,11 @@ set_property PACKAGE_PIN K18 [get_ports {hdmi_tx_data_n[0]}]
 # write_bank_sync1 signal
 set_false_path -to [get_pins -hier -filter {NAME =~ *isnt1_scan_out/write_bank_sync1_reg/D}]
 
+# Floorplan: keep all compute logic together so routing stays short
+create_pblock pblock_compute
+add_cells_to_pblock [get_pblocks pblock_compute] [get_cells inst1_mc]
+add_cells_to_pblock [get_pblocks pblock_compute] [get_cells inst1_bram]
+resize_pblock [get_pblocks pblock_compute] -add {SLICE_X0Y0:SLICE_X69Y149}
+resize_pblock [get_pblocks pblock_compute] -add {RAMB36_X0Y0:RAMB36_X2Y29}
+resize_pblock [get_pblocks pblock_compute] -add {DSP48_X0Y0:DSP48_X3Y59}
+

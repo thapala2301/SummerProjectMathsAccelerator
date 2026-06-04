@@ -99,9 +99,19 @@ logic [19:0] done_count;
 
 localparam [19:0] FRAME_RAY_COUNT = 20'd921600;
 
-assign bram_wea = mc_pix_done;
-assign bram_addra = render_bank ? (19'd230400 + mc_out_pix_id[18:0]) : mc_out_pix_id[18:0];
-assign bram_dina = mc_out_iter;
+logic        bram_wea_reg;
+logic [18:0] bram_addra_reg;
+logic [7:0]  bram_dina_reg;
+
+always_ff @(posedge sys_clk) begin
+    bram_wea_reg <= mc_pix_done;
+    bram_addra_reg <= render_bank ? (19'd230400 + mc_out_pix_id[18:0]) : mc_out_pix_id[18:0];
+    bram_dina_reg <= mc_out_iter;
+end
+
+assign bram_wea = bram_wea_reg;
+assign bram_addra = bram_addra_reg;
+assign bram_dina = bram_dina_reg;
 assign dispatch_pipeline_ready = ~fc_stall & dispatch_enable;
 
 always_ff @(posedge sys_clk) begin

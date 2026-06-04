@@ -70,7 +70,16 @@ sdf_term inst2_term2(.clk(clk), .vx(qx), .vy(py_intermed_d), .vz(qz), .out(term2
 sdf_term inst3_term3(.clk(clk), .vx(qx), .vy(qy), .vz(pz_intermed_d), .out(term3));
 
 fp_min inst1_min(.a(term1), .b(term2), .out(temp_min));
-fp_min inst2_min(.a(temp_min), .b(term3), .out(sdf_comb));
+
+reg [26:0] temp_min_reg;
+reg [26:0] term3_reg;
+
+always @(posedge clk) begin
+    temp_min_reg <= temp_min;
+    term3_reg <= term3;
+end
+
+fp_min inst2_min(.a(temp_min_reg), .b(term3_reg), .out(sdf_comb));
 
 always @(posedge clk) begin
     sdf_out <= sdf_comb;

@@ -47,7 +47,7 @@ module ray_gen #(
 
     localparam int HALF_W = IMG_W / 2;
     localparam int HALF_H = IMG_H / 2;
-    localparam int PIPE_LAT = 36;
+    localparam int PIPE_LAT = 48;
     localparam logic [26:0] FOV_Z_CONST_X2 = {
         FOV_Z_CONST[26],
         FOV_Z_CONST[25:18] + 8'd1,
@@ -134,10 +134,10 @@ module ray_gen #(
     wire [26:0] s6_inv_mag;
     fp_isqrt isqrt(.clk(clk), .a(s5_mag2), .out(s6_inv_mag));
     wire [26:0] s6_dx_dl, s6_dy_dl, s6_dz_dl;
-    //10cycle delay
-    state_pipe #(.WIDTH(27), .DEPTH(10)) pipe_dx_f4(.clk(clk), .in(s5_dx_dl), .out(s6_dx_dl));
-    state_pipe #(.WIDTH(27), .DEPTH(10)) pipe_dy_f4(.clk(clk), .in(s5_dy_dl), .out(s6_dy_dl));
-    state_pipe #(.WIDTH(27), .DEPTH(10)) pipe_dz_f4(.clk(clk), .in(s5_dz_dl), .out(s6_dz_dl));
+    //18cycle delay
+    state_pipe #(.WIDTH(27), .DEPTH(18)) pipe_dx_f4(.clk(clk), .in(s5_dx_dl), .out(s6_dx_dl));
+    state_pipe #(.WIDTH(27), .DEPTH(18)) pipe_dy_f4(.clk(clk), .in(s5_dy_dl), .out(s6_dy_dl));
+    state_pipe #(.WIDTH(27), .DEPTH(18)) pipe_dz_f4(.clk(clk), .in(s5_dz_dl), .out(s6_dz_dl));
 
 
     //s7 normalise 2cycle
@@ -147,7 +147,7 @@ module ray_gen #(
     fp_mul norm_z(.clk(clk), .a(s6_inv_mag), .b(s6_dz_dl), .out(s7_dz));
 
     //delay lookat and origin from s0
-    localparam int DELAY = 24;
+    localparam int DELAY = 34;
     wire [26:0] lk_dl [0:8];
     wire [26:0] orig_dl [0:2];
     wire [PIX_ID_W-1:0] id_dl;
@@ -175,13 +175,13 @@ module ray_gen #(
     fp_mul p7(.clk(clk), .a(lk_dl[7]), .b(s7_dy), .out(s8_p[7]));
     fp_mul p8(.clk(clk), .a(lk_dl[8]), .b(s7_dz), .out(s8_p[8]));
 
-    //delay org and id by 2 for s8
+    //delay org and id by 4 for s8
     wire [26:0] orig_dl2 [0:2];
     wire [PIX_ID_W-1:0] id_dl2;
-    state_pipe #(.WIDTH(27), .DEPTH(2)) pipe_ox2(.clk(clk), .in(orig_dl[0]), .out(orig_dl2[0]));
-    state_pipe #(.WIDTH(27), .DEPTH(2)) pipe_oy2(.clk(clk), .in(orig_dl[1]), .out(orig_dl2[1]));
-    state_pipe #(.WIDTH(27), .DEPTH(2)) pipe_oz2(.clk(clk), .in(orig_dl[2]), .out(orig_dl2[2]));
-    state_pipe #(.WIDTH(PIX_ID_W), .DEPTH(2)) pipe_id2(.clk(clk), .in(id_dl), .out(id_dl2));
+    state_pipe #(.WIDTH(27), .DEPTH(4)) pipe_ox2(.clk(clk), .in(orig_dl[0]), .out(orig_dl2[0]));
+    state_pipe #(.WIDTH(27), .DEPTH(4)) pipe_oy2(.clk(clk), .in(orig_dl[1]), .out(orig_dl2[1]));
+    state_pipe #(.WIDTH(27), .DEPTH(4)) pipe_oz2(.clk(clk), .in(orig_dl[2]), .out(orig_dl2[2]));
+    state_pipe #(.WIDTH(PIX_ID_W), .DEPTH(4)) pipe_id2(.clk(clk), .in(id_dl), .out(id_dl2));
 
     //s9 col0 +col1 for each row
     wire [26:0] s9_sum [0:2];

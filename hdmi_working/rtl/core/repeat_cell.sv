@@ -91,7 +91,9 @@ end
 endfunction
 
 wire [26:0] abs_p;
-wire [26:0] wrap_off;
+wire [26:0] wrap_off_comb;
+reg  [26:0] wrap_off;
+reg  [26:0] p_r;
 wire [26:0] p_minus_wrap;
 wire [26:0] p_plus_wrap;
 wire [26:0] p_d4;
@@ -99,14 +101,21 @@ wire        p_neg_d4;
 wire        p_wrap_d4;
 
 fp_abs inst_abs_p(.in(p), .out(abs_p));
-assign wrap_off = repeat_offset(abs_p);
+assign wrap_off_comb = repeat_offset(abs_p);
 
-fp_sub inst_sub_wrap(.clk(clk), .a(p), .b(wrap_off), .out(p_minus_wrap));
-fp_add inst_add_wrap(.clk(clk), .a(p), .b(wrap_off), .out(p_plus_wrap));
+//register wrappoff and p to break fp_abs and repeatoffset combinatorial path
+always @(posedge clk) begin
+    wrap_off <= wrap_off_comb;
+    p_r      <= p;
+end
 
-state_pipe #(.WIDTH(27), .DEPTH(4)) pipe_p_d4    (.clk(clk), .in(p),          .out(p_d4));
-state_pipe #(.WIDTH(1),  .DEPTH(4)) pipe_sign_d4 (.clk(clk), .in(p[26]),      .out(p_neg_d4));
-state_pipe #(.WIDTH(1),  .DEPTH(4)) pipe_wrap_d4 (.clk(clk), .in(|wrap_off),  .out(p_wrap_d4));
+fp_sub inst_sub_wrap(.clk(clk), .a(p_r), .b(wrap_off), .out(p_minus_wrap));
+fp_add inst_add_wrap(.clk(clk), .a(p_r), .b(wrap_off), .out(p_plus_wrap));
+
+// Delays increase by 1 to match the extra input register cycle
+state_pipe #(.WIDTH(27), .DEPTH(5)) pipe_p_d4    (.clk(clk), .in(p),               .out(p_d4));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_sign_d4 (.clk(clk), .in(p[26]),           .out(p_neg_d4));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_wrap_d4 (.clk(clk), .in(|wrap_off_comb),  .out(p_wrap_d4));
 
 always_comb begin
     if (!p_wrap_d4)

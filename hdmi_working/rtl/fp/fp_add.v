@@ -5,19 +5,25 @@ module fp_add(
     output [26:0] out
 );
 
-//Stage 1: compare full mag, sel big small, comp shift amt
+//Stage 1: compare magnitude, select big/small, compute shift
+// Compare exponent first (8-bit) then mantissa only if equal
+// This avoids a 26-bit ripple carry chain at 150 MHz
 reg [26:0] sm, bg;
 reg [7:0] shift_amt;
+
+(* keep = "true" *) wire [7:0] diff_ab = a[25:18] - b[25:18];
+(* keep = "true" *) wire [7:0] diff_ba = b[25:18] - a[25:18];
+(* keep = "true" *) wire a_bigger = (a[25:0] > b[25:0]);
+
 always @ (posedge clk) begin
-    if (a[25:0] > b[25:0]) begin
+    if (a_bigger) begin
         sm <= b;
         bg <= a;
-        shift_amt <= a[25:18]-b[25:18];
-    end
-    else begin // includes same expo??
+        shift_amt <= diff_ab;
+    end else begin
         sm <= a;
         bg <= b;
-        shift_amt <= b[25:18]-a[25:18];
+        shift_amt <= diff_ba;
     end
 end
 
@@ -75,19 +81,88 @@ always @ (posedge clk) begin
         s4_mant <= 18'b0;
     end else begin
         s4_sign <= s3_result_sign;
-        lead_pos = 0;
-        //upward scan LSB -> MSB
-        for (j=0; j<20; j=j+1)
-            if (mant_result[j]) lead_pos =j;
-        
-        if (lead_pos == 19) begin
-            s4_mant <= mant_result[18:1];
-            s4_exp <= s3_exp + 1;
-        end
-        else begin
-            s4_mant <= mant_result << (18-lead_pos);
-            s4_exp <= s3_exp + lead_pos - 8'd18; // if dot closer to LSB need to dec. 18 is threshold/normal scenario
-        end
+        casex (mant_result)
+            20'b1???????????????????: begin
+                s4_mant <= mant_result[18:1];
+                s4_exp  <= s3_exp + 1;
+            end
+            20'b01??????????????????: begin
+                s4_mant <= mant_result[17:0];
+                s4_exp  <= s3_exp;
+            end
+            20'b001?????????????????: begin
+                s4_mant <= {mant_result[16:0], 1'b0};
+                s4_exp  <= s3_exp - 1;
+            end
+            20'b0001????????????????: begin
+                s4_mant <= {mant_result[15:0], 2'b0};
+                s4_exp  <= s3_exp - 2;
+            end
+            20'b00001???????????????: begin
+                s4_mant <= {mant_result[14:0], 3'b0};
+                s4_exp  <= s3_exp - 3;
+            end
+            20'b000001??????????????: begin
+                s4_mant <= {mant_result[13:0], 4'b0};
+                s4_exp  <= s3_exp - 4;
+            end
+            20'b0000001?????????????: begin
+                s4_mant <= {mant_result[12:0], 5'b0};
+                s4_exp  <= s3_exp - 5;
+            end
+            20'b00000001????????????: begin
+                s4_mant <= {mant_result[11:0], 6'b0};
+                s4_exp  <= s3_exp - 6;
+            end
+            20'b000000001???????????: begin
+                s4_mant <= {mant_result[10:0], 7'b0};
+                s4_exp  <= s3_exp - 7;
+            end
+            20'b0000000001??????????: begin
+                s4_mant <= {mant_result[9:0],  8'b0};
+                s4_exp  <= s3_exp - 8;
+            end
+            20'b00000000001?????????: begin
+                s4_mant <= {mant_result[8:0],  9'b0};
+                s4_exp  <= s3_exp - 9;
+            end
+            20'b000000000001????????: begin
+                s4_mant <= {mant_result[7:0], 10'b0};
+                s4_exp  <= s3_exp - 10;
+            end
+            20'b0000000000001???????: begin
+                s4_mant <= {mant_result[6:0], 11'b0};
+                s4_exp  <= s3_exp - 11;
+            end
+            20'b00000000000001??????: begin
+                s4_mant <= {mant_result[5:0], 12'b0};
+                s4_exp  <= s3_exp - 12;
+            end
+            20'b000000000000001?????: begin
+                s4_mant <= {mant_result[4:0], 13'b0};
+                s4_exp  <= s3_exp - 13;
+            end
+            20'b0000000000000001????: begin
+                s4_mant <= {mant_result[3:0], 14'b0};
+                s4_exp  <= s3_exp - 14;
+            end
+            20'b00000000000000001???: begin
+                s4_mant <= {mant_result[2:0], 15'b0};
+                s4_exp  <= s3_exp - 15;
+            end
+            20'b000000000000000001??: begin
+                s4_mant <= {mant_result[1:0], 16'b0};
+                s4_exp  <= s3_exp - 16;
+            end
+            20'b0000000000000000001?: begin
+                s4_mant <= {mant_result[0],   17'b0};
+                s4_exp  <= s3_exp - 17;
+            end
+            default: begin
+                s4_mant <= 18'b0;
+                s4_exp  <= 8'b0;
+            end
+        endcase
     end
 
 
