@@ -1,0 +1,369 @@
+{
+  "design": {
+    "design_info": {
+      "boundary_crc": "0x7BDC097E8312C8FF",
+      "device": "xc7z020clg400-1",
+      "gen_directory": "../../../../hdmi_test_proj.gen/sources_1/bd/hdmi_test_bd",
+      "name": "hdmi_test_bd",
+      "rev_ctrl_bd_flag": "RevCtrlBdOff",
+      "synth_flow_mode": "Hierarchical",
+      "tool_version": "2025.2",
+      "validated": "true"
+    },
+    "design_tree": {
+      "clk_wiz_0": "",
+      "test_pattern_gen_0": "",
+      "framebuffer_bram_0": "",
+      "scan_out_0": ""
+    },
+    "ports": {
+      "rst_n": {
+        "type": "rst",
+        "direction": "I",
+        "parameters": {
+          "INSERT_VIP": {
+            "value": "0",
+            "value_src": "default"
+          },
+          "POLARITY": {
+            "value": "ACTIVE_LOW"
+          }
+        }
+      },
+      "sysclk": {
+        "type": "clk",
+        "direction": "I",
+        "parameters": {
+          "CLK_DOMAIN": {
+            "value": "hdmi_test_bd_sysclk",
+            "value_src": "default"
+          },
+          "FREQ_HZ": {
+            "value": "125000000"
+          },
+          "FREQ_TOLERANCE_HZ": {
+            "value": "0",
+            "value_src": "default"
+          },
+          "INSERT_VIP": {
+            "value": "0",
+            "value_src": "default"
+          },
+          "PHASE": {
+            "value": "0.0",
+            "value_src": "default"
+          }
+        }
+      },
+      "hdmi_hsync": {
+        "direction": "O"
+      },
+      "hdmi_vsync": {
+        "direction": "O"
+      },
+      "hdmi_active": {
+        "direction": "O"
+      },
+      "hdmi_rgb": {
+        "direction": "O",
+        "left": "23",
+        "right": "0"
+      }
+    },
+    "components": {
+      "clk_wiz_0": {
+        "vlnv": "xilinx.com:ip:clk_wiz:6.0",
+        "ip_revision": "17",
+        "xci_name": "hdmi_test_bd_clk_wiz_0_0",
+        "xci_path": "ip\\hdmi_test_bd_clk_wiz_0_0\\hdmi_test_bd_clk_wiz_0_0.xci",
+        "inst_hier_path": "clk_wiz_0",
+        "has_run_ip_tcl": "true",
+        "parameters": {
+          "CLKOUT1_REQUESTED_OUT_FREQ": {
+            "value": "74.25"
+          },
+          "CLKOUT2_REQUESTED_OUT_FREQ": {
+            "value": "371.25"
+          },
+          "CLKOUT2_USED": {
+            "value": "true"
+          },
+          "PRIM_IN_FREQ": {
+            "value": "125.000"
+          }
+        }
+      },
+      "test_pattern_gen_0": {
+        "vlnv": "xilinx.com:module_ref:test_pattern_gen_wrapper:1.0",
+        "ip_revision": "1",
+        "xci_name": "hdmi_test_bd_test_pattern_gen_0_0",
+        "xci_path": "ip\\hdmi_test_bd_test_pattern_gen_0_0\\hdmi_test_bd_test_pattern_gen_0_0.xci",
+        "inst_hier_path": "test_pattern_gen_0",
+        "has_run_ip_tcl": "true",
+        "reference_info": {
+          "ref_type": "hdl",
+          "ref_name": "test_pattern_gen_wrapper",
+          "boundary_crc": "0x0"
+        },
+        "ports": {
+          "clk_74_25": {
+            "direction": "I",
+            "parameters": {
+              "FREQ_HZ": {
+                "value": "74255952",
+                "value_src": "ip_prop"
+              },
+              "PHASE": {
+                "value": "0.0",
+                "value_src": "ip_prop"
+              },
+              "CLK_DOMAIN": {
+                "value": "/clk_wiz_0_clk_out1",
+                "value_src": "ip_prop"
+              }
+            }
+          },
+          "rst_n": {
+            "type": "rst",
+            "direction": "I",
+            "parameters": {
+              "POLARITY": {
+                "value": "ACTIVE_LOW",
+                "value_src": "constant"
+              }
+            }
+          },
+          "bram_addr": {
+            "direction": "O",
+            "left": "19",
+            "right": "0"
+          },
+          "bram_data_in": {
+            "direction": "O",
+            "left": "23",
+            "right": "0"
+          },
+          "bram_we": {
+            "direction": "O"
+          }
+        }
+      },
+      "framebuffer_bram_0": {
+        "vlnv": "xilinx.com:module_ref:framebuffer_bram_wrapper:1.0",
+        "ip_revision": "1",
+        "xci_name": "hdmi_test_bd_framebuffer_bram_0_0",
+        "xci_path": "ip\\hdmi_test_bd_framebuffer_bram_0_0\\hdmi_test_bd_framebuffer_bram_0_0.xci",
+        "inst_hier_path": "framebuffer_bram_0",
+        "has_run_ip_tcl": "true",
+        "reference_info": {
+          "ref_type": "hdl",
+          "ref_name": "framebuffer_bram_wrapper",
+          "boundary_crc": "0x0"
+        },
+        "ports": {
+          "clka": {
+            "direction": "I",
+            "parameters": {
+              "FREQ_HZ": {
+                "value": "74255952",
+                "value_src": "ip_prop"
+              },
+              "PHASE": {
+                "value": "0.0",
+                "value_src": "ip_prop"
+              },
+              "CLK_DOMAIN": {
+                "value": "/clk_wiz_0_clk_out1",
+                "value_src": "ip_prop"
+              }
+            }
+          },
+          "wea": {
+            "direction": "I"
+          },
+          "addra": {
+            "direction": "I",
+            "left": "19",
+            "right": "0"
+          },
+          "dina": {
+            "direction": "I",
+            "left": "23",
+            "right": "0"
+          },
+          "clkb": {
+            "direction": "I",
+            "parameters": {
+              "FREQ_HZ": {
+                "value": "74255952",
+                "value_src": "ip_prop"
+              },
+              "PHASE": {
+                "value": "0.0",
+                "value_src": "ip_prop"
+              },
+              "CLK_DOMAIN": {
+                "value": "/clk_wiz_0_clk_out1",
+                "value_src": "ip_prop"
+              }
+            }
+          },
+          "addrb": {
+            "direction": "I",
+            "left": "19",
+            "right": "0"
+          },
+          "doutb": {
+            "direction": "O",
+            "left": "23",
+            "right": "0"
+          }
+        }
+      },
+      "scan_out_0": {
+        "vlnv": "xilinx.com:module_ref:scan_out_wrapper:1.0",
+        "ip_revision": "1",
+        "xci_name": "hdmi_test_bd_scan_out_0_0",
+        "xci_path": "ip\\hdmi_test_bd_scan_out_0_0\\hdmi_test_bd_scan_out_0_0.xci",
+        "inst_hier_path": "scan_out_0",
+        "has_run_ip_tcl": "true",
+        "reference_info": {
+          "ref_type": "hdl",
+          "ref_name": "scan_out_wrapper",
+          "boundary_crc": "0x0"
+        },
+        "ports": {
+          "clk_74_25": {
+            "direction": "I",
+            "parameters": {
+              "FREQ_HZ": {
+                "value": "74255952",
+                "value_src": "ip_prop"
+              },
+              "PHASE": {
+                "value": "0.0",
+                "value_src": "ip_prop"
+              },
+              "CLK_DOMAIN": {
+                "value": "/clk_wiz_0_clk_out1",
+                "value_src": "ip_prop"
+              }
+            }
+          },
+          "rst_n": {
+            "type": "rst",
+            "direction": "I",
+            "parameters": {
+              "POLARITY": {
+                "value": "ACTIVE_LOW",
+                "value_src": "constant"
+              }
+            }
+          },
+          "bram_addrb": {
+            "direction": "O",
+            "left": "19",
+            "right": "0"
+          },
+          "bram_doutb": {
+            "direction": "I",
+            "left": "23",
+            "right": "0"
+          },
+          "hdmi_hsync": {
+            "direction": "O"
+          },
+          "hdmi_vsync": {
+            "direction": "O"
+          },
+          "hdmi_active": {
+            "direction": "O"
+          },
+          "hdmi_rgb": {
+            "direction": "O",
+            "left": "23",
+            "right": "0"
+          }
+        }
+      }
+    },
+    "nets": {
+      "clk_wiz_0_clk_out1": {
+        "ports": [
+          "clk_wiz_0/clk_out1",
+          "test_pattern_gen_0/clk_74_25",
+          "framebuffer_bram_0/clka",
+          "framebuffer_bram_0/clkb",
+          "scan_out_0/clk_74_25"
+        ]
+      },
+      "framebuffer_bram_0_doutb": {
+        "ports": [
+          "framebuffer_bram_0/doutb",
+          "scan_out_0/bram_doutb"
+        ]
+      },
+      "rst_n_1": {
+        "ports": [
+          "rst_n",
+          "test_pattern_gen_0/rst_n",
+          "scan_out_0/rst_n"
+        ]
+      },
+      "scan_out_0_bram_addrb": {
+        "ports": [
+          "scan_out_0/bram_addrb",
+          "framebuffer_bram_0/addrb"
+        ]
+      },
+      "scan_out_0_hdmi_active": {
+        "ports": [
+          "scan_out_0/hdmi_active",
+          "hdmi_active"
+        ]
+      },
+      "scan_out_0_hdmi_hsync": {
+        "ports": [
+          "scan_out_0/hdmi_hsync",
+          "hdmi_hsync"
+        ]
+      },
+      "scan_out_0_hdmi_rgb": {
+        "ports": [
+          "scan_out_0/hdmi_rgb",
+          "hdmi_rgb"
+        ]
+      },
+      "scan_out_0_hdmi_vsync": {
+        "ports": [
+          "scan_out_0/hdmi_vsync",
+          "hdmi_vsync"
+        ]
+      },
+      "sysclk_1": {
+        "ports": [
+          "sysclk",
+          "clk_wiz_0/clk_in1"
+        ]
+      },
+      "test_pattern_gen_0_bram_addr": {
+        "ports": [
+          "test_pattern_gen_0/bram_addr",
+          "framebuffer_bram_0/addra"
+        ]
+      },
+      "test_pattern_gen_0_bram_data_in": {
+        "ports": [
+          "test_pattern_gen_0/bram_data_in",
+          "framebuffer_bram_0/dina"
+        ]
+      },
+      "test_pattern_gen_0_bram_we": {
+        "ports": [
+          "test_pattern_gen_0/bram_we",
+          "framebuffer_bram_0/wea"
+        ]
+      }
+    }
+  }
+}

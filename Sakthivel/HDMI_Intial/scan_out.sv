@@ -3,18 +3,10 @@
 module scan_out (
     input  logic        clk_74_25,
     input  logic        rst_n,
-    input  logic        write_bank, 
-    
-    // Params
-    input  logic [7:0]  color_thresh_1,
-    input  logic [7:0]  color_thresh_2,
-    input  logic [7:0]  color_thresh_3,
-    input  logic [2:0]  color_shift_1,
-    input  logic [2:0]  color_shift_2,
     
     // Memory
-    output logic [18:0] bram_addrb,
-    input  logic [7:0]  bram_doutb,
+    output logic [19:0] bram_addrb,
+    input  logic [23:0] bram_doutb,
     
     // HDMI
     output logic        hdmi_hsync,
@@ -40,46 +32,22 @@ module scan_out (
         .pixel_y      (pixel_y)
     );
 
-    // Buffering
-    logic read_bank;
-    logic timing_vsync_prev;
-    
-    always_ff @(posedge clk_74_25) begin
-        if (!rst_n) begin
-            read_bank         <= 1'b0;
-            timing_vsync_prev <= 1'b0;
-        end else begin
-            timing_vsync_prev <= timing_vsync;
-            if (timing_vsync && !timing_vsync_prev) begin
-                read_bank <= write_bank;
-            end
-        end
-    end
-
-    // Mapping
-    logic [9:0] map_x;
-    logic [9:0] map_y;
-    logic [18:0] offset;
-    
-    assign map_x = pixel_x[11:1];
-    assign map_y = pixel_y[11:1];
-    assign offset = (map_y * 19'd640) + map_x;
+    // Mapping (Reverse the downsampling)
+    // Map the 1280x720 coordinate to the 640x720 compressed array
+    logic [19:0] linear_idx;
+    assign linear_idx = (pixel_y * 20'd1280) + pixel_x;
 
     // Pipeline 1
     logic hsync_d1, vsync_d1, active_d1;
     
     always_ff @(posedge clk_74_25) begin
         if (!rst_n) begin
-            bram_addrb <= 19'd0;
+            bram_addrb <= 20'd0;
             hsync_d1   <= 1'b0;
             vsync_d1   <= 1'b0;
             active_d1  <= 1'b0;
         end else begin
-            if (read_bank) begin
-                bram_addrb <= 19'd230400 + offset;
-            end else begin
-                bram_addrb <= offset;
-            end
+            bram_addrb <= linear_idx[19:1]; // Divide by 2 to match BRAM compression
             
             hsync_d1  <= timing_hsync;
             vsync_d1  <= timing_vsync;
@@ -128,7 +96,7 @@ module scan_out (
             hdmi_active  <= active_d2;
             
             if (active_d2) begin
-                hdmi_rgb <= mapped_rgb;
+                hdmi_rgb <= bram_doutb; // Already decompressed to 24-bit RGB from the BRAM module
             end else begin
                 hdmi_rgb <= 24'd0;
             end
