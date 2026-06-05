@@ -1,0 +1,29 @@
+Notes to Vincent (and anyone else tryna use this):
+
+There are 3 key file types in this folder.
+One is visualise.py
+One is export_weights
+One is x_test
+Where x is a range of different test I am running
+
+Start from sphere and work your way up until it
+fails or doesn`t run further so we can exploit
+the most complicated shape for visualising.
+
+Order:
+x_test.py
+export_weights.py -> Change pth file in line 31 when needed
+visualise.py -> Make changes to line 27 when needed
+
+Dependencies:
+pip install torch numpy matplotlib trimesh
+
+Outputted Hex Files:
+All Q4.12 fixed point, 16-bit, one value per line
+weights/w_abcdefg -> weights for each neuron
+weights/b_abcdefg -> Biases for each neuron
+
+Network: 3 32 32 32 1
+We are working in the range [-2,2]
+Output is the signed distance as we expected
+Activation Function used is ReLU - Rectified Linear Unit
