@@ -13,7 +13,7 @@ the most complicated shape for visualising.
 Order:
 x_test.py
 export_weights.py -> Change pth file in line 31 when needed
-visualise.py -> Make changes to line 27 when needed
+visualise.py -> Make changes to line 27 when needed + line 50
 
 Dependencies:
 pip install torch numpy matplotlib trimesh
