@@ -1,5 +1,8 @@
 //lookat has three axis: right, up, forward. Each is a dir in 3D space, so takes 3 numbers
 //hence 9 numbers total
+
+
+//UGLY RN, NEURAL IS JUST HERE BUT DOESN'T GO THROUGH MARCH CORE
 module top(
 
     input logic clk, //PL clk 
@@ -185,6 +188,25 @@ framebuffer_bram inst1_bram(
     .addrb(bram_addrb),
     .doutb(bram_doutb)
 );
+
+
+// neural SDF signals
+logic neural_baking_done;
+logic [26:0] neural_dist;
+logic neural_dist_valid;
+
+neural_sdf_top inst_neural_sdf(
+    .clk(sys_clk),
+    .rst(rst),
+    .baking_done(neural_baking_done),
+    .x(fc_pos_x),      // feed current march position
+    .y(fc_pos_y),
+    .z(fc_pos_z),
+    .query_valid(fc_valid),
+    .dist(neural_dist),
+    .dist_valid(neural_dist_valid)
+);
+
 
 rgb2dvi_0 inst1_rgb2dvi(
     .PixelClk(clk_pixel),

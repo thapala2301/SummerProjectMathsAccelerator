@@ -22,12 +22,15 @@ logic neuron_valids [0:total_neuron_No-1]; //pack as array
 
 genvar i;
 generate 
-    for (i = 0; i<total_neuron_No; i=i+1) begin
-        neuron #(.dataWidth(dataWidth), .actType("relu"), .nb_weights(nb_weights), .weight_length(weight_length))
+    for (i = 0; i<total_neuron_No; i=i+1) begin: gen_neurons
+        //special syntax to custom file name, needed for weight loading, no latency as $ means at runtime
+        localparam string wf = $sformatf("weights/w_%0d_%0d.hex", layer_No, i);
+        localparam string bf = $sformatf("weights/b_%0d_%0d.hex", layer_No, i);
+        neuron #(.dataWidth(dataWidth), .actType("relu"), .nb_weights(nb_weights), .weight_length(weight_length), .weightFile(wf), .biasFile(bf))
         insti_neuron(
             .clk(clk),
             .rst(rst),
-            .curr_x(in),
+            .curr_in(in),
             .valid_curr_in(valid_curr_in),
             .neuron_out(out[i]),
             .out_valid(neuron_valids[i])
