@@ -5,18 +5,23 @@ module scene_sdf(
     output reg [26:0] sdf_out
 );
 
-wire [26:0] b_fp = {1'b0, 8'd127, 18'h00000}; // 1.0
- //RESET TO 4.5 in 1.8.18 WHEN ALL WORKs
+ wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000}; // 4.5
 wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD}; // 0.15
-//RESET TO 0.15 WHEN ALL WORK
 
 //b : half extent of box, e : edge thickness
 
+wire [26:0] rep_px, rep_py, rep_pz;
+repeat_cell inst_repeat_x(.clk(clk), .p(px), .q(rep_px));
+repeat_cell inst_repeat_y(.clk(clk), .p(py), .q(rep_py));
+repeat_cell inst_repeat_z(.clk(clk), .p(pz), .q(rep_pz));
+
+//instead of eval SDF at raw world pos, first fold pos into nearest repeating cell
+//SDF eval as if only one box frame, but every cell in infinite space gets one
 //Stage A
 wire [26:0] abs_px, abs_py, abs_pz, px_intermed, py_intermed, pz_intermed, px_intermed2, py_intermed2, pz_intermed2, temp_add_px, temp_add_py, temp_add_pz, qx, qy, qz;
-fp_abs inst_abs_px (.in(px), .out(abs_px));
-fp_abs inst_abs_py (.in(py), .out(abs_py));
-fp_abs inst_abs_pz (.in(pz), .out(abs_pz));
+fp_abs inst_abs_px(.in(rep_px), .out(abs_px));
+fp_abs inst_abs_py(.in(rep_py), .out(abs_py));
+fp_abs inst_abs_pz(.in(rep_pz), .out(abs_pz));
 
 fp_sub sub_px_b (.clk(clk), .a(abs_px), .b(b_fp), .out(px_intermed));
 fp_sub sub_py_b(.clk(clk), .a(abs_py),.b(b_fp), .out(py_intermed));
@@ -50,8 +55,16 @@ sdf_term inst3_term3(.clk(clk), .vx(qx), .vy(qy), .vz(pz_intermed_d), .out(term3
 
 //now have stage A + B, take min of all
 wire [26:0] temp_min, sdf_comb;
+
 fp_min inst1_min(.a(term1), .b(term2), .out(temp_min));
-fp_min inst2_min(.a(temp_min), .b(term3), .out(sdf_comb));
+
+reg [26:0] temp_min_reg, term3_reg;
+always @ (posedge clk) begin
+    temp_min_reg <= temp_min;
+    term3_reg <= term3;
+end
+
+fp_min inst2_min(.a(temp_min_reg), .b(term3_reg), .out(sdf_comb));
 always @(posedge clk) sdf_out <= sdf_comb;
 
 

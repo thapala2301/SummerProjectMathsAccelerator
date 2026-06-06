@@ -12,9 +12,11 @@
 */
 
 /*
-fp_mul : 2 clk latency
+fp_mul : 4 clk latency
 fp_add = 4 clk
 fp_sub = 4clk
+
+OBSOLETE COMMENTS..
 
 Cycle 0:  y0, hx computed (combinational)
 Cycle 2:  y2 = mul(y0, y0) done
@@ -44,13 +46,13 @@ wire [26:0] fp_1_5 = {1'b0, 8'd127, 18'h20000};
 assign y0 = magic_number - (a>>1); //comb
 assign hx = {a[26], a[25:18] -8'd1, a[17:0]}; //comb:mantissa unchanged, just sub 1 from exp
 //State pipes for waiting and propagating valu
-state_pipe #(.WIDTH(27), .DEPTH(2)) pipe_hx(
+state_pipe #(.WIDTH(27), .DEPTH(4)) pipe_hx(
     .clk(clk),
     .in(hx),
     .out(hx_delayed)
 );
 
-state_pipe #(.WIDTH(27), .DEPTH(8)) pipe_y0(
+state_pipe #(.WIDTH(27), .DEPTH(12)) pipe_y0(
     .clk(clk),
     .in(y0),
     .out(y0_delayed)
