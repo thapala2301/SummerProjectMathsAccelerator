@@ -16,6 +16,7 @@ logic [4:0] leading_pos;
 logic [7:0] exponent_biased;
 logic [17:0] mantissa;
 logic [14:0] magnitude; //convert to 2s comp
+logic [31:0] shifted;
 assign magnitude = sign_bit ? (~in[14:0] + 1'b1) : in[14:0];
 
 always_comb begin
@@ -24,11 +25,11 @@ always_comb begin
         if (magnitude[i]) leading_pos = i;
     end
     exponent_biased = (leading_pos >= 12) ? 127 + (leading_pos - 12) : 127 - (12-leading_pos);
-    mantissa = (32'(magnitude) << (18-leading_pos)) [17:0];
-    if (magnitude == 0) begin exponent_biased = 0; mantissa = 0; end
+    shifted = (32'(magnitude) << (18 - leading_pos));
+    if (magnitude == 0) begin exponent_biased = 0; shifted = 0; end
 end
 
-assign out = {sign_bit, exponent_biased, mantissa};
+assign out = {sign_bit, exponent_biased, shifted[17:0]};
 
 //logic
 endmodule

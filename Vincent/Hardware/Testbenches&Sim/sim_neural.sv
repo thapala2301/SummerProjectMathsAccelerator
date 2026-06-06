@@ -1,1 +1,0 @@
-//simulation for neural output

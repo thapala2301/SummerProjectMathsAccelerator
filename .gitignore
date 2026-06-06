@@ -5,3 +5,11 @@ cpu_reference/*.exe
 cpu_reference/benchmark.csv
 cpu_reference/out.ppm
 cpu_reference/out.png
+
+Cornell_Work
+
+# Verilator build artifacts
+Vincent/Hardware/obj_dir/
+Vincent/Hardware/frame.ppm
+Vincent/Hardware/neural_frame.ppm
+*.ppm

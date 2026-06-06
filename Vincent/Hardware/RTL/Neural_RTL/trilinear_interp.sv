@@ -9,7 +9,7 @@ module trilinear_interp(
     input logic [26:0] z,
     input logic query_valid,
 
-    output logic [26:0] dist,
+    output logic [26:0] distance,
     output logic dist_valid,
 
     input logic [26:0] bram_dout,
@@ -159,7 +159,7 @@ blend_lerp u_lerp_c01_c11_ty (.clk(clk), .rst(rst), .a(c01) , .b(c11), .t(ty), .
 //collapse to z line
 blend_lerp u_lerp_c0_c1_tx (.clk(clk), .rst(rst), .a(c0) , .b(c1), .t(tz), .out_blend(result));
 
-assign dist = result;
+assign distance = result;
 wire reads_done = (rd_count == 8) & reading; //fires when last BRAM read finishes 
 wire dist_valid_w;
 

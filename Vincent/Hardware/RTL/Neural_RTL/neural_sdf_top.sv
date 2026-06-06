@@ -6,7 +6,7 @@ module neural_sdf_top(
 
     input logic [26:0] x,y,z,
     input logic query_valid,
-    output logic [26:0] dist, //feed to ray marcher
+    output logic [26:0] distance, //feed to ray marcher
     output logic dist_valid
 );
 
@@ -65,7 +65,7 @@ trilinear_interp u_triliniterp(
     .clk(clk), .rst(rst),
     .x(x), .y(y), .z(z),
     .query_valid(query_valid),
-    .dist(dist),
+    .distance(distance),
     .dist_valid(dist_valid),
     .bram_dout(bram_rdata),
     .bram_addr(bram_raddr)
