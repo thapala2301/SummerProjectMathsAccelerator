@@ -11,8 +11,9 @@ module FIFO #(
     output logic              FIFO_FULL,
     output logic              FIFO_EMPTY
 );
+    //infer as BRAM, saves 2200 luts and we have lots of bram headroom
+    (* ram_style = "block" *) logic [WIDTH-1:0] mem [0:DEPTH-1];
 
-    logic [WIDTH-1:0] mem [0:DEPTH-1];
 
     logic [$clog2(DEPTH)-1:0] write_ptr;
     logic [$clog2(DEPTH)-1:0] read_ptr;
