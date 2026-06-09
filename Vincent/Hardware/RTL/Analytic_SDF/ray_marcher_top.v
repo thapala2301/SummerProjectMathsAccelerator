@@ -1,10 +1,16 @@
-//lookat has three axis: right, up, forward. Each is a dir in 3D space, so takes 3 numbers
-//hence 9 numbers total
-
-//UGLY RN, NEURAL IS JUST HERE BUT DOESN'T GO THROUGH MARCH CORE
+/*
+Top module
+inputs: clk, rst, M_AXI write ports, ADD AXI-Lite cam reg
+M_AXI ports go to PS7 HP port (high bandwidth) via AXI intercoonect, that's how px get written to DDR3.
+VDMA seperately reads from DDR3 to drive display. Share DDR3 but talk to it independently through interconnect
+AXI interconnect: acts as bridge between multiple AXI masters and slaves. Handles width conversion, CDC
+Need AXI interconnect because PS7 HP port is single AXI slave port - has one set of AW W B AR R signals. But have multiple masters:
+ray marcher + VDMA both accessing DDR3. Interconnect gives each master own dedicated port. Then internally arbitrates and funnels
+AXI interconnect handles address mapping to PS7 HP port space
+*/
 module ray_marcher_top (
-    input  wire       sys_clk, //PL clk 
-    input  wire       rst_n, //don't use this 
+    input  wire       sys_clk, 
+    input  wire       rst_n,
 
     output wire [31:0] M_AXI_AWADDR,
     output wire M_AXI_AWVALID,
@@ -26,15 +32,7 @@ module ray_marcher_top (
 wire rst;
 assign rst =  ~rst_n;
 
-
-/*
-identity lookat: right = (1,0,0), up = (0,1,0) up is y axis, forward = (0,0,1) look along z
-45° rotation around Y:
-right   = ( 0.707, 0, -0.707)  // right is now front-right diagonal
-up      = ( 0,     1,  0    )  // up unchanged
-forward = ( 0.707, 0,  0.707)  // cam look toward +x and +z simultaneously
-*/
-localparam [26:0] FP_ONE     = 27'h1FC0000; //=1.0
+localparam [26:0] FP_ONE     = 27'h1FC0000; 
 localparam [26:0] FP_ZERO    = 27'h0000000;
 localparam [26:0] FP_NEG_ONE = 27'h5FC0000; 
 localparam [26:0] FP_P015    = 27'h1F0CCCD;
@@ -118,6 +116,7 @@ wire [7:0]  mc_out_iter_0, mc_out_iter_1;
 
 // --- end of specific march core signals
 
+//in case of concurrent core use, must arbitrate
 //march core choice/arbitrage, arb: arbiter, picks winner when concurrent use.
 //the arb signals are sigs the priority mux sels from the cores before passing to axifbwriter
 reg [1:0] core_sel;
@@ -200,7 +199,7 @@ axi_fb_writer inst_axi_writer(
     .AWBURST_out(M_AXI_AWBURST), .AWCACHE_out(M_AXI_AWCACHE), .AWPROT_out(M_AXI_AWPROT)
 );
 
-//3 march core instances
+//2 march core instances
 march_core inst0_mc(
     .clk(sys_clk),
     .rst_n(~rst),
@@ -261,7 +260,7 @@ march_core inst1_mc(
     .fb_valid(mc_fb_valid_1)
 );
 
-//3 feedback ctrl instance
+//2 feedback ctrl instance
 feedback_ctrl inst0_fb_ctrl(
     .clk(sys_clk),
     .rst(rst),

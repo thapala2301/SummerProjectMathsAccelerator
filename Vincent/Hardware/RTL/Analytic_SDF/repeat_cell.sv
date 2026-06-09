@@ -1,3 +1,13 @@
+/*
+Module handling space repition.
+FOR NOW implements pseudo mod function in FP 27. define a cell to be 10 units each side, containing 3 x 3 x 3 box frame
+Then we can apply space repetition, as we have a perfectly periodic scene fitting in a cell
+We take the raytip of the world p, fold it to fit in the canonical cell,
+evaluate SDF at q (using periodicity) and march ray p.
+Folding : mapping p to nearest cell. SDF dist is valid everywhere, as neareast surf in real repeated world
+is always same as nearest surface in canonical cell, provided half_ext < cell_sz/2 (for box frame, for other scenes look at most protruding param)
+*/
+
 module repeat_cell(
     input  logic        clk,
     input  logic [26:0] p,
@@ -108,7 +118,7 @@ wire        p_neg_d4;
 wire        p_wrap_d4;
 
 fp_abs inst_abs_p(.in(p), .out(abs_p));
-assign wrap_off_comb = repeat_offset(abs_p);
+assign wrap_off_comb = repeat_offset(abs_p); //obtain by how many we should sub or add to get coordinates within canonical cell
 
 //register wrappoff and p to break fp_abs and repeatoffset combinatorial path
 always @(posedge clk) begin
@@ -121,9 +131,10 @@ fp_add inst_add_wrap(.clk(clk), .a(p_r), .b(wrap_off), .out(p_plus_wrap));
 
 // Delays increase by 1 to match the extra input register cycle
 state_pipe #(.WIDTH(27), .DEPTH(5)) pipe_p_d4    (.clk(clk), .in(p),               .out(p_d4));
-state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_sign_d4 (.clk(clk), .in(p[26]),           .out(p_neg_d4));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_sign_d4 (.clk(clk), .in(p[26]),           .out(p_neg_d4)); //extracts sign, see if it's negative
 state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_wrap_d4 (.clk(clk), .in(|wrap_off_comb),  .out(p_wrap_d4));
-
+//key insight in line above is |wrap_off_comb indicating reduction or: is 1 if any bit of wrap_off_comb is set, ie offset is non zero
+//this is same as doing wrap_off_comb != 27'h0
 always_comb begin
     if (!p_wrap_d4)
         q = p_d4;

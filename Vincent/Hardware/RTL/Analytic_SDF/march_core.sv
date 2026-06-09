@@ -20,6 +20,7 @@ module march_core(
     input logic  [26:0]lookat [0:8],
     input logic [26:0] cam_origin [0:2],
 
+    //OBSOLETE?
     //output to fb_write
     output logic pix_done,
     output logic [19:0]out_pix_id,
@@ -37,7 +38,12 @@ module march_core(
     output logic fb_valid
 );
 
-//stage 1: ray gen, rg_lat = 13
+localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
+localparam MAX_ITER = 128;
+
+
+
+//stage 1: ray gen, rg_lat = 48
 logic [26:0] rg_dir[0:2];
 logic [26:0] rg_orig[0:2];
 logic rg_valid;
@@ -48,7 +54,7 @@ localparam RG_LAT = 48; //48 clk latency in ray gen dir det, ray gen takes longe
 ray_gen #(
     .IMG_W(1280),
     .IMG_H(720),
-    .FOV_Z_CONST(27'h221A000)
+    .FOV_Z_CONST(27'h221A000) //720 so like 83.3° angle FOV
 ) inst1_ray_gen (
     //inputs
     .clk(clk),
@@ -70,7 +76,7 @@ ray_gen #(
 wire[26:0] rg_dir_x=rg_dir[0];
 wire[26:0] rg_dir_y=rg_dir[1];
 wire[26:0] rg_dir_z=rg_dir[2];
-//must hold for 13 clk values of in_pos, in_dir, in_iter, in_pix_id
+//must hold for RG_LAT clk values of in_pos, in_dir, in_iter, in_pix_id
 logic [26:0] d1_pos_x, d1_pos_y, d1_pos_z, d1_dir_x, d1_dir_y, d1_dir_z;
 logic [26:0] s1_pos_x, s1_pos_y, s1_pos_z, s1_dir_x, s1_dir_y, s1_dir_z;
 logic [7:0] d1_iter;
@@ -132,7 +138,7 @@ logic [7:0] d2_iter;
 logic [19:0] d2_pix_id;
 logic d2_valid;
 
-//must hold for 38 clks the values that arrive with sdf_dist
+//must hold for SDF_LAT clks the values that arrive with sdf_dist
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_x(.clk(clk), .in(s1_pos_x), .out(d2_pos_x));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_y(.clk(clk), .in(s1_pos_y), .out(d2_pos_y));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_z(.clk(clk), .in(s1_pos_z), .out(d2_pos_z));
@@ -154,22 +160,25 @@ fp_mul inst1_mul_z (.clk(clk), .a(sdf_dist), .b(d2_dir_z), .out(step_z));
 
 //then do total dist = curr dist + sdf_dist*dir
 //fp add 4 clk delay ON 150MHZ
-//rework understanding from here on
+
+//while d2_pos_x,y,z is available NOW, step_x,y,z still needs 4 clk to be computed, so delay d2_pos_x,y,z by 4 clk
 logic [26:0] new_pos_x, new_pos_y, new_pos_z, d2_pos_x_d, d2_pos_y_d, d2_pos_z_d;
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_x_d(.clk(clk), .in(d2_pos_x), .out(d2_pos_x_d));
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_y_d(.clk(clk), .in(d2_pos_y), .out(d2_pos_y_d));
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_z_d(.clk(clk), .in(d2_pos_z), .out(d2_pos_z_d));
 
+//march the ray in all 3 directions: compute new position, using newpos = old pos + step along x,y,z
 fp_add inst1_add_x(.clk(clk), .a(d2_pos_x_d), .b(step_x), .out(new_pos_x));
 fp_add inst1_add_y(.clk(clk), .a(d2_pos_y_d), .b(step_y), .out(new_pos_y));
 fp_add inst1_add_z(.clk(clk), .a(d2_pos_z_d), .b(step_z), .out(new_pos_z));
 
-//total mul + add = 6 clk
+
 logic [26:0] d3_dir_x, d3_dir_y, d3_dir_z, d3_dist;
 logic [7:0] d3_iter;
 logic [19:0] d3_pix_id;
 logic d3_valid;
-localparam STEP_LAT = 8;
+localparam STEP_LAT = 8; //total 8 clk from old pos to new pos (add + product step compute)
+//all other signals dir, dist, iter, pix_id, valid that aren't computed need to be delayed by same 8 clcyles so that they align with new_pos when comes out
 state_pipe #(.WIDTH(27), .DEPTH(STEP_LAT)) inst_d3_dir_x(.clk(clk), .in(d2_dir_x),  .out(d3_dir_x));
 state_pipe #(.WIDTH(27), .DEPTH(STEP_LAT)) inst_d3_dir_y(.clk(clk), .in(d2_dir_y),  .out(d3_dir_y));
 state_pipe #(.WIDTH(27), .DEPTH(STEP_LAT)) inst_d3_dir_z(.clk(clk), .in(d2_dir_z),  .out(d3_dir_z));
@@ -178,16 +187,12 @@ state_pipe #(.WIDTH(8),  .DEPTH(STEP_LAT)) inst_d3_iter (.clk(clk), .in(d2_iter)
 state_pipe #(.WIDTH(20), .DEPTH(STEP_LAT)) inst_d3_pid  (.clk(clk), .in(d2_pix_id), .out(d3_pix_id));
 state_pipe #(.WIDTH(1),  .DEPTH(STEP_LAT)) inst_d3_valid(.clk(clk), .in(d2_valid),  .out(d3_valid));
 
-localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
-localparam MAX_ITER = 128;
-wire hit_comb = d3_valid & (d3_dist[26] | (d3_dist < HIT_THRESH));
+wire hit_comb = d3_valid & (d3_dist[26] | (d3_dist < HIT_THRESH)); //if sign bit is set, dist negative, we are inside an object so clearly we hit it
 wire miss_comb = d3_valid & (d3_iter >= MAX_ITER);
 wire done_comb = hit_comb | miss_comb;
 
-
-//register all outputs breaks d3_dist comparator to BRAM WEA combinatorial path
 always_ff @ (posedge clk) begin
-    pix_done     <= d3_valid & done_comb;
+    pix_done     <= d3_valid & done_comb; //ray is done, send to fb_write
     fb_pix_id    <= d3_pix_id;
     fb_pos_x     <= new_pos_x;
     fb_pos_y     <= new_pos_y;
@@ -196,7 +201,7 @@ always_ff @ (posedge clk) begin
     fb_ray_dir_y <= d3_dir_y;
     fb_ray_dir_z <= d3_dir_z;
     fb_iter      <= d3_iter + 8'd1;
-    fb_valid     <= d3_valid & ~done_comb;
+    fb_valid     <= d3_valid & ~done_comb; //if set, ray is not done yet, must feed back for another march iteration
     out_pix_id   <= d3_pix_id;
     out_iter     <= d3_iter;
 end

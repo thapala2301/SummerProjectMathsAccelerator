@@ -1,11 +1,20 @@
 `timescale 1ns/1ps
 `default_nettype none
 
+/*
+Takes in pixel coordinates pix_x 0 to 2027 , pix_y 0 to 1023
+as well as pixel id: 1280 x 720 = 921 600 pixels so 2^20 values : 20 bits
+as well as lookat camera matrix for world basis orthornormal vectors, camera origin
+
+Ouputs the ray orig (simple pass of cam origin through pipeline), pix_id (pass)
+and the ray_dir x y z in world space (after lookat matrix multiplication),
+as well as pipeline ready signal held high as no stall condition
+*/
 module ray_gen #(
     parameter int IMG_W = 1280,
     parameter int IMG_H = 720,
-    parameter int PIX_ID_W = 20,
-    parameter logic [26:0] FOV_Z_CONST = 27'h1FC0000
+    parameter int PIX_ID_W = 20, //pix id wire, w for width
+    parameter logic [26:0] FOV_Z_CONST = 27'h1FC0000  // = FP_ONE
 )(
     input wire clk,
     input wire rst_n,
@@ -25,6 +34,9 @@ module ray_gen #(
     output logic pipeline_ready
 );
 
+    //lookout for this, could easily be critical path**
+
+    //takes a 16 bit pixel coordinate: x or y. 16 bits chosen for good headroom
     function automatic logic [26:0] fp_int2fp(input logic signed [15:0] n);
         logic sign;
         logic [15:0] mag;
@@ -34,20 +46,26 @@ module ray_gen #(
         logic [15:0] mag_no_msb;
         if (n == 0) return 27'h0;
         sign = n[15];
-        mag = sign ? $unsigned(-n) : $unsigned(n);
+        mag = sign ? $unsigned(-n) : $unsigned(n); //equivalent of doing 2s complement +1, cleaner
         lead = 0;
         for (int j = 0; j < 16; j++) begin
-            if (mag[j]) lead = j;
+            if (mag[j]) lead = j; //find leading 1 in the 16 bit number
         end
-        exp = 8'(lead + 127);
-        mag_no_msb = mag & ((16'h1 << lead) - 16'h1);
+        exp = 8'(lead + 127); //get exponent, biased by 127 for FP
+        //we must exclude the implicit leading 1 always present in FP. must get mag[lead-1:0], use mask for bottom N bits trick (1<<N)-1
+        //get leading 1s followed by lead0s, and substract 1 to generate exactly lead1s.
+        //then and with magnitude (after masking) to obtain the first 1 in the mantissa
+        mag_no_msb = mag & ((16'h1 << lead) - 16'h1); 
         mant = 18'(mag_no_msb) << (18 - lead);
         return {sign, exp, mant};
     endfunction
 
-    localparam int HALF_W = IMG_W / 2;
-    localparam int HALF_H = IMG_H / 2;
     localparam int PIPE_LAT = 48;
+    //scale entire camera space / world by 2 as: center of 1280 px img is 639.5 px, not int
+    //true center: 639.5 * 2 = 1279
+
+    //fov is z because camera is always same dist to screen along z axis.
+    //increase z: angle to edges of screen smaller, smaller FOV
     localparam logic [26:0] FOV_Z_CONST_X2 = {
         FOV_Z_CONST[26],
         FOV_Z_CONST[25:18] + 8'd1,
@@ -56,11 +74,9 @@ module ray_gen #(
 
     //valid shift reg 34
     localparam int VSR_DEPTH = PIPE_LAT - 1;
-    logic [VSR_DEPTH-1:0] valid_sr;
-    always_ff @(posedge clk)begin
-        if(!rst_n) valid_sr <= '0;
-        else valid_sr <= {valid_sr[VSR_DEPTH-2:0], valid_in};
-    end
+    logic valid_sr_out;
+    state_pipe #(.WIDTH(1), .DEPTH(VSR_DEPTH)) u_vsr(.clk(clk), .in(valid_in), .out(valid_sr_out));
+
 
     //s0 register inputs
     logic [10:0] s0_px;
@@ -69,6 +85,7 @@ module ray_gen #(
     logic [26:0] s0_lookat [0:8];
     logic [26:0] s0_orig [0:2];
 
+    //latch inputs into s0
     always_ff @(posedge clk) begin
         s0_px <= pix_x;
         s0_py <= pix_y;
@@ -82,9 +99,13 @@ module ray_gen #(
     logic [26:0] s1_dz;
 
     always_ff @(posedge clk) begin
+        //following the scaling of entire camera space, get xcoord*2 and substract 1279. 
+        //as we want pixel 0 to give -1279 and pixel 1279 to give 1279, perfect sym around 0 
         s1_dx <= ({ {20{1'b0}}, s0_px, 1'b0 }) - 32'(IMG_W - 1);
+        //same here, but invert the Y coordinate such that py=0 maps to positive 3D axis. py = 719 should map to negative 3D Y
+        //px range 0 to 719: px 0 -> 719, pix 719 -> -719
         s1_dy <= 32'(IMG_H - 1) - ({ {21{1'b0}}, s0_py, 1'b0 });
-        s1_dz <= FOV_Z_CONST_X2;
+        s1_dz <= FOV_Z_CONST_X2; //carry through scaling
     end
 
     //s2 fp_int2fp convert int offset to 27bit float
@@ -95,6 +116,8 @@ module ray_gen #(
         s2_dz_f <= s1_dz;
     end
 
+    //obtain the normalized vector for dx,dy,dz : dirx, diry, dz. vec/norm computation
+    //MAKE MODULE FOR 1/length
     //s3 square and normalise
     wire [26:0] s3_dx2, s3_dy2, s3_dz2;
     fp_mul dx2(.clk(clk), .a(s2_dx_f), .b(s2_dx_f), .out(s3_dx2));
@@ -146,6 +169,7 @@ module ray_gen #(
     fp_mul norm_y(.clk(clk), .a(s6_inv_mag), .b(s6_dy_dl), .out(s7_dy));
     fp_mul norm_z(.clk(clk), .a(s6_inv_mag), .b(s6_dz_dl), .out(s7_dz));
 
+    //WRITE PACKED ARRAY STATE PIPE
     //delay lookat and origin from s0
     localparam int DELAY = 34;
     wire [26:0] lk_dl [0:8];
@@ -163,6 +187,10 @@ module ray_gen #(
     endgenerate
     state_pipe #(.WIDTH(PIX_ID_W), .DEPTH(DELAY)) pipe_id(.clk(clk), .in(s0_id), .out(id_dl));
 
+    //have lookat set of 3 vectors, all orthonormal- each represent axis in world space: x,y,z
+    //multiply by the dirx, diry, dirz vector: obtain rotation/projection along the world axis
+    //this gives true dir vector: already unit vector because unit vec* orthonormal mtx = unit vec. length preserved by transform
+    
     //s8 9matx partial products 2cycle
     wire [26:0] s8_p [0:8];
     fp_mul p0(.clk(clk), .a(lk_dl[0]), .b(s7_dx), .out(s8_p[0]));
@@ -227,7 +255,7 @@ module ray_gen #(
             ray_dir[1] <= s10_rd[1];
             ray_dir[2] <= s10_rd[2];
             pix_id_out <= id_dl4;
-            valid_out <= valid_sr[VSR_DEPTH-1];
+            valid_out <= valid_sr_out;
         end
     end
 

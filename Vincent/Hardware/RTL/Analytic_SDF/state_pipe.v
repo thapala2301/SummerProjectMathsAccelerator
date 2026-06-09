@@ -1,3 +1,7 @@
+/*
+Used throughout design, state pipe delays a signal N cycle, crucial as our design is heavily pipelined,
+and sometimes signals must wait for others to arrive through computation: we pipe them through
+*/
 module state_pipe #(
     parameter WIDTH =32,
     parameter DEPTH = 1 //the latency in clock cycles

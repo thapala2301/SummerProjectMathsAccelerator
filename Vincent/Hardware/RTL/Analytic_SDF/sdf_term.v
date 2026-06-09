@@ -1,5 +1,8 @@
 //computes 
 // length(max((v0,v1,v2),0.))+ min(max(v0,max(v1,v2)),0)
+/*
+inputs: x,y,z component of p (tip of vector), outputs the term ength(max((v0,v1,v2),0.))+ min(max(v0,max(v1,v2)),0)
+*/
 module sdf_term(
     input clk,
     input wire[26:0] vx,
@@ -18,7 +21,6 @@ module sdf_term(
     fp_length inst_len (.clk(clk), .x(cx), .y(cy), .z(cz), .out(len));
 
     //second term
-
     wire[26:0] temp_max;
     fp_max inst1_max(.a(vy), .b(vz), .out(temp_max) );
 
@@ -31,12 +33,10 @@ module sdf_term(
 
     wire [26:0] temp_maxv0_maxv1_v2;
     fp_max inst2_max(.a(vx_reg), .b(temp_max_reg), .out(temp_maxv0_maxv1_v2));
-    //clamped neg holds:max(v0,max(v1,v2)),0
-
+    
     //second term
-    //clamped neg holds:max(v0,max(v1,v2)),0
+    //clamped neg holds: min( max(v0, max(v1, v2)), 0 ): if it's negative, minimum is temp max, else it's zero (bc temp max positive)
     wire [26:0] clamped_neg = temp_maxv0_maxv1_v2[26] ? temp_maxv0_maxv1_v2 : 27'b0;
-
 
     // fp_length now 32 cycles (fp_mul=4, fp_isqrt=16, fp_add=4)
     // clamped_neg calculation now takes 1 cycle, so pipe depth is 31 to align with len output (31 + 1 = 32)

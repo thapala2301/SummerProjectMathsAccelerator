@@ -1,3 +1,10 @@
+/*
+Generates stream of pixel coords, counts through every px in frame in raster order
+outputs x,y, pix_id, valid
+one pixel per clk when pipeline_ready is high
+x : 0 -> 127, y increments each row, pix_id = y*1280 + x
+pipeline_ready low: pause
+*/
 module pixel_dispatch(
     input  logic        clk,
     input  logic        rst,
@@ -9,9 +16,10 @@ module pixel_dispatch(
     output logic [19:0] pix_id
 );
 
-assign pix_id = ((y_pixel >> 1) * 640) + (x_pixel >> 1);
+assign pix_id = ((y_pixel >> 1) * 640) + (x_pixel >> 1); //compute pix_id at half resolution, ASR. *640 due to pix_id = row * W + col, grid of width W
 assign valid  = ~rst & pipeline_ready;
 
+//raster order  scan
 always_ff @(posedge clk) begin
     if (rst) begin
         x_pixel <= 1'b0;

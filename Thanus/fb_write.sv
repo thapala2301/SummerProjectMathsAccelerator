@@ -1,6 +1,8 @@
-// When a pixel is finished being dealt with, we need to get its colour 
-// from Sakthi`s colour map and write to correct address in framebuffer
-// BRAM
+/* When a pixel is finished being dealt with, we need to get its colour 
+from Sakthi`s colour map and write to correct address in framebuffer
+BRAM
+Not used in VDMA design
+*/
 
 module fb_write(
     input logic        clk,

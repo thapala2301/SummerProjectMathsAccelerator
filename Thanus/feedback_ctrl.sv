@@ -1,3 +1,14 @@
+/*
+Feedback loop with march core. Decides whether to send new pixel into march core
+or re send an existing ray that needs another march iteration. Has internal FIFO.
+if ray is not done yet, fb_valid is high from mc and ray is pushed into FIFO.
+Next clk its possed from FIFO; and only when FIFO empty are new pixels accepted from dispatch
+stall is high if FIFO full, tell dispatch to wait
+
+Inputs: x,y, pix_id, valid and all mc signals.
+Outputs: complete ray descriptor per clk, when valid
+*/
+
 module feedback_ctrl (
     input logic        clk,
     input logic        rst,
@@ -22,25 +33,28 @@ module feedback_ctrl (
     input logic        pipeline_ready,
 
 //Goes to Vincent
-    output logic [10:0] out_x,
+    output logic [10:0] out_x, //px coords, for ray gen on first iter
     output logic [9:0]  out_y,
-    output logic [19:0] out_pix_id,
-    output logic [26:0] out_pos_x,
+    output logic [19:0] out_pix_id, 
+    output logic [26:0] out_pos_x, //current 3d pos of ray tip
     output logic [26:0] out_pos_y,
-    output logic [26:0] out_pos_z,
-    output logic [26:0] out_ray_dir_x,
+    output logic [26:0] out_pos_z, 
+    output logic [26:0] out_ray_dir_x, //ray dir, normalized
     output logic [26:0] out_ray_dir_y,
     output logic [26:0] out_ray_dir_z,
-    output logic [7:0]  out_iteration_count,
-    output logic        out_validity,
+    output logic [7:0]  out_iteration_count, //how many steps so far
+    output logic        out_validity, //whether output is valid ray to process
 
-    output logic        stall
+    output logic        stall //backpressure for dispatch
 );
 
-    logic [189:0] fifo_rd_data;
+    //pix id: 20 bits, pos_x,y,z: 27*3==81 bits, dir_x,y,z = 27*3 = 81 bits, iter count : 8 bits
+    //total 190 bits, each FIFO entry holds all these entries needed to resume a ray mid marching
+    logic [189:0] fifo_rd_data; 
     logic         fifo_full;
     logic         fifo_empty;
 
+    //fifo inst
     FIFO #(
         .WIDTH(190),
         .DEPTH(128)
@@ -74,9 +88,10 @@ module feedback_ctrl (
             out_validity        <= 1'b0;
         end
         else if (!fifo_empty && pipeline_ready) begin
-            out_x               <= 1'b0;
+            //existing pixel (already marched) dispatch
+            out_x               <= 1'b0; //0 placeholder for X/don't care: we have already marched the ray so don't care about initial pos on screen
             out_y               <= 1'b0;
-            out_pix_id          <= fifo_rd_data[189:170];
+            out_pix_id          <= fifo_rd_data[189:170]; //send the actual data to continue marching
             out_pos_x           <= fifo_rd_data[169:143];
             out_pos_y           <= fifo_rd_data[142:116];
             out_pos_z           <= fifo_rd_data[115:89];
@@ -87,6 +102,7 @@ module feedback_ctrl (
             out_validity        <= 1'b1;
         end
         else if (fifo_empty && pipeline_ready && valid) begin
+            //new pixel coming in, store only its coordinates on the screen as it has not been marched yet (this will be fed to ray gen).
             out_x               <= x_pixel;
             out_y               <= y_pixel;
             out_pix_id          <= pix_id;

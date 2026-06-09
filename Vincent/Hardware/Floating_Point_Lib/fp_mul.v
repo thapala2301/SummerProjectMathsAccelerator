@@ -1,3 +1,9 @@
+/*
+Multiplies 2 FP27 numbers
+Algorithm:
+1. compute sign, raw exponent, 38 bit mantissa product
+2. check if exponent needs +-1 rule
+*/
 module fp_mul(
     input clk,
     input wire [26:0] a,
@@ -29,7 +35,6 @@ always @(posedge clk) begin
     s1_prod <= full_prod;
 end
 
-
 // stage 2: register raw DSP output — breaks DSP output + carry normalise chain
 reg s2_sign;
 reg [8:0] s2_exp;
@@ -50,6 +55,9 @@ always @ (posedge clk) begin
     if (s2_zero) begin
         s3_exp  <= 8'd0;
         s3_mant <= 18'd0;
+    //2 19 bit numbers 1.mantissa multiplied together gives 38 bits, result is either
+    //1x.xxx (bit37 set) product overflowed in bit 37, meaning res >=2: shfit right
+    //01.xxx (bit 37 clear) already normalized, extract normal mant
     end else if (s2_prod[37]) begin
         s3_exp  <= s2_exp[7:0] + 8'd1;
         s3_mant <= s2_prod[36:19];

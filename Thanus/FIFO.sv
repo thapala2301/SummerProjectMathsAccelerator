@@ -1,3 +1,8 @@
+/*
+Normal synchronous FIFO, to store data on all the mid marching pixels
+Input data element and enable write read, output read data and empty/full flags
+*/
+
 module FIFO #(
     parameter WIDTH = 220,
     parameter DEPTH = 128

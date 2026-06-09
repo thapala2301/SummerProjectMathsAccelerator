@@ -1,3 +1,6 @@
+/*
+Negate an FP27 number
+*/
 module fp_negate(
     input wire [26:0] in,
     output wire [26:0] out

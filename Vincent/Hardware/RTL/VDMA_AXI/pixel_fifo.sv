@@ -1,3 +1,10 @@
+/*
+FIFO to store incoming pixels that have been marched fully from march_core
+Used as backpressure for AXI FSM, stores at most 16 incoming pixels while AXI FSM sends pixels to DDR3 controller
+
+inputs: wr_en, wr_data, rd_en and outputs full/empty flags, the read data
+*/
+
 module pixel_fifo(
     input logic clk, rst,
     input logic wr_en, 
