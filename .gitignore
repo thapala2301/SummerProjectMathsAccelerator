@@ -13,3 +13,13 @@ Vincent/Hardware/obj_dir/
 Vincent/Hardware/frame.ppm
 Vincent/Hardware/neural_frame.ppm
 *.ppm
+
+# Generated Vivado project outputs for Charlie camera snapshots.
+Charlie/hdmi_working_camera_bram/v/
+Charlie/hdmi_working_camera_bram/vivado/
+Charlie/hdmi_working_camera_ddr/v/
+Charlie/hdmi_working_camera_ddr/vivado/
+Charlie/hdmi_working_camera_bram/.Xil/
+Charlie/hdmi_working_camera_ddr/.Xil/
+Charlie/hdmi_working_camera_bram/__pycache__/
+Charlie/hdmi_working_camera_ddr/__pycache__/
