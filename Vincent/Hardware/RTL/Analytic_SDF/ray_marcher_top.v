@@ -26,7 +26,17 @@ module ray_marcher_top (
     input wire M_AXI_WREADY,
     input wire M_AXI_BVALID,
     output wire M_AXI_BREADY,
-    input wire [1:0] M_AXI_BRESP
+    input wire [1:0] M_AXI_BRESP,
+
+    //AXI LITE SIGNALS FOR interactivity of scene
+    input wire [5:0] s_axi_awaddr,
+    input wire s_axi_awvalid,
+    input wire s_axi_awready,
+    input wire [31:0] s_axi_wdata,
+    input wire [3:0] s_axi_wstrb,
+    input wire s_axi_wvalid,
+    input wire s_axi_wready,
+    input wire s_axi_bresp, s_axi_bvalid, s_axi_brready
 );
 
 wire rst;
@@ -40,6 +50,17 @@ localparam [26:0] FP_P45     = 27'h2048000;
 
 wire [26:0] lookat[0:8];
 reg [26:0] cam_origin[0:2];
+wire [26:0] cell_sz, f_fp, e_fp;
+
+
+axi_camera_regs inst_cam_regs (
+    .aclk(sys_clk), .aresetn(rst_n),
+    .s_axi_awaddr(s_axi_awaddr), .s_axi_awvalid(s_axi_awvalid),
+    .s_axi_awready(s_axi_awready), .s_axi_wdata(s_axi_wdata),
+    .s_axi_wstrb(s_axi_wstrb), .s_axi_wvalid(s_axi_wvalid), 
+    .s_axi_wready(s_axi_wready),
+    
+);
 
 assign lookat[0] = FP_ONE;
 assign lookat[1] = FP_ZERO;
@@ -51,30 +72,6 @@ assign lookat[6] = FP_ZERO;
 assign lookat[7] = FP_ZERO;
 assign lookat[8] = FP_NEG_ONE;
 
-//FOR TESTING DELETE AFTER ***
-localparam [26:0] CAM_Z_0 = 27'h2020000; // z = 3.0
-localparam [26:0] CAM_Z_1 = 27'h2048000; // z = 4.5 (original)
-localparam [26:0] CAM_Z_2 = 27'h2060000; // z = 6.0
-localparam [26:0] CAM_Z_3 = 27'h2080000; // z = 8.0
-reg [1:0] frame_cnt;
-always @(posedge sys_clk) begin
-    if (rst) begin
-        frame_cnt     <= 2'd0;
-        cam_origin[0] <= FP_ZERO;
-        cam_origin[1] <= FP_P015;
-        cam_origin[2] <= CAM_Z_0;
-
-    end else if (arb_pix_done && done_count == FRAME_RAY_COUNT - 1'b1) begin
-        frame_cnt <= frame_cnt + 1'b1;
-        case (frame_cnt)
-            2'd0: cam_origin[2] <= CAM_Z_1;
-            2'd1: cam_origin[2] <= CAM_Z_2;
-            2'd2: cam_origin[2] <= CAM_Z_3;
-            2'd3: cam_origin[2] <= CAM_Z_0;
-        endcase
-    end
-end
-// DELETE ***
 
 //assign cam_origin[2] = FP_P45;
 

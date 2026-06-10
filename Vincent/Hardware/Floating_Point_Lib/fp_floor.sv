@@ -6,7 +6,7 @@ If e>=18, number is large int, no frac bits: floor = input unchanged
 If 0 <= e < 18: binary point sits in mantissa bits: zero out the bottom 18-e mantissa bits
 
 
-FIX FOR NEGATIVES ****
+FIX FOR NEGATIVES ******* NOT DONE YET
 */
 
 module fp_floor (
@@ -17,8 +17,18 @@ module fp_floor (
 
 logic [7:0] true_exponent;
 assign true_exponent = a[25:18]-127;
+logic [26:0] a_1;
+localparam [26:0] FP_ONE     = 27'h1FC0000; 
+localparam [26:0] FP_NEG_ONE = 27'h5FC0000; 
 
+
+fp_sub u_suba1 (.clk(clk), .a(a), .b(FP_ONE), .out(a_1));
 always_comb begin
+    if (a[26]) begin
+        if (a[25:18] < 8'd127) floor_a = FP_NEG_ONE;
+        else floor_a = a_1;
+    end
+
     if (a[25:18] < 8'd127) //if true expo is neg
         floor_a = 0;
     else if (true_exponent >= 18)

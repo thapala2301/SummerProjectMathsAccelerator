@@ -33,7 +33,10 @@ module march_core(
     output logic [26:0]fb_pos_z,
     output logic [19:0]fb_pix_id,
     output logic [26:0] fb_dist, //give curr dist back to feedback control
-    output logic fb_valid
+    output logic fb_valid,
+
+    //scene dependent params
+    input logic [26:0] b_fp, e_fp, cell_sz
 );
 
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
@@ -131,7 +134,11 @@ scene_sdf inst1_scene_sdf(
     .px(s1_pos_x),
     .py(s1_pos_y),
     .pz(s1_pos_z),
+    .b_fp(b_fp),
+    .e_fp(e_fp),
+    .cell_sz(cell_sz),
     .sdf_out(sdf_dist)
+
 );
 
 logic [26:0] d2_pos_x, d2_pos_y, d2_pos_z, d2_dir_x, d2_dir_y, d2_dir_z;

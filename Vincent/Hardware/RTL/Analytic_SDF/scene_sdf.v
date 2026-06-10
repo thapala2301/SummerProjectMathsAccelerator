@@ -24,17 +24,18 @@ is always same as nearest surface in canonical cell, provided half_ext < cell_sz
 
 module scene_sdf(
     input clk,
-    input [26:0] px, py, pz,
+    input wire [26:0] px, py, pz,
+    input wire [26:0] b_fp, e_fp, cell_sz,
     output reg [26:0] sdf_out
 );
 
-wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000}; // 4.5
-wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD}; // 0.15
+// wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000}; // 4.5
+// wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD}; // 0.15
 
 //b : half extent of box, e : edge thickness
 
 //obtain the coordinates in canonical cell for SDF computation- space repetition
-localparam cell_sz  = 27'h2090000; //=10 in FP. TEMP. CHANGE TO INPUT FROM AXI WHEN MUSIC REACTIVE
+// localparam cell_sz  = 27'h2090000; //=10 in FP. TEMP. CHANGE TO INPUT FROM AXI WHEN MUSIC REACTIVE
 wire [26:0] rep_px, rep_py, rep_pz;
 fp_modulus inst_repeat_x(.clk(clk), .a(px), .b(cell_sz), .rem(rep_px));
 fp_modulus inst_repeat_y(.clk(clk), .a(py), .b(cell_sz), .rem(rep_py));

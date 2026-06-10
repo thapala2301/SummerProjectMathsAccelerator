@@ -38,7 +38,18 @@ module axi_camera_regs #(
     input logic s_axi_rready,
 
     output logic [26:0] lookat [0:8],
-    output logic [26:0] cam_origin [0:2]
+    output logic [26:0] cam_origin [0:2],
+    output logic [26:0] sdf_params [0:7]
+    /*in sdf params :
+    0->cell sz
+    1->b_fp
+    2->e_fp
+    3->fog_density
+    4->march_epsilon
+    5->palette shift value
+    6,7->morph blend
+    Extend if needed
+    */
 );
 
     // 1.0:  sign=0, exp=127=0x7F, frac=0  -> {1'b0, 8'h7F, 18'h0} = 27'h1FC0000
@@ -46,7 +57,7 @@ module axi_camera_regs #(
     localparam logic [26:0] FP_ONE = 27'h1FC0000;
     localparam logic [26:0] FP_NEG_ONE = 27'h5FC0000;
 
-    logic [DATA_W-1:0] regfile [0:11];
+    logic [DATA_W-1:0] regfile [0:19];
 
     //pack lookat from the first 9 elements of the regfile, camorigin from last 3 elements of regfile
     genvar gi;
@@ -56,6 +67,9 @@ module axi_camera_regs #(
         end
         for (gi = 0; gi < 3; gi++) begin : gen_origin
             assign cam_origin[gi] = regfile[9 + gi][26:0];
+        end
+        for (gi = 0; gi < 8; gi++) begin : gen_sdf_params
+            assign sdf_params[gi] = regfile[12+gi][26:0];
         end
     endgenerate
 
@@ -87,6 +101,16 @@ module axi_camera_regs #(
             regfile[9] <= '0;
             regfile[10] <= '0;
             regfile[11] <= '0;
+            //fix the defaults later
+            regfile[12] <= {5'h0, 27'h2090000}; //cell_sz default 10.0
+            regfile[13] <= {5'h0, 27'h2048000}; //b_fp default 4.5
+            regfile[14] <= {5'h0, 27'h1F0CCCD}; //e_fp default 0.15
+            regfile[15] <= '0;
+            regfile[16] <= '0;
+            regfile[17] <= '0;
+            regfile[18] <= '0;
+            regfile[19] <= '0;
+
         end else begin
             //if slave (PL) ready to accept adress and adress is valid, latch it and wait for other components to be ready
             if (s_axi_awvalid && s_axi_awready) begin
@@ -104,7 +128,7 @@ module axi_camera_regs #(
                 //convert the adress to an int for accessing element of packed array reg file
                 //automatic keyword: instantiation of word_idx contained to for loop
                 automatic int word_idx = int'(aw_addr_latch[ADDR_W-1:2]);
-                if (word_idx < 12) begin //if its in [0:11] elements of the packed array
+                if (word_idx < 20) begin //if its in [0:11] elements of the packed array
                     for (int b = 0; b < 4; b++) begin
                         if (w_strb_latch[b])
                             //w_strb strobe masks bytes if 0
