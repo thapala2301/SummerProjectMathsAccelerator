@@ -1,12 +1,17 @@
 /*
-Module handling space repition.
-FOR NOW implements pseudo mod function in FP 27. define a cell to be 10 units each side, containing 3 x 3 x 3 box frame
+
+UNUSED 
+Module handling PSEUDO space repition.
+Uses PSEUDO mod function in FP 27. define a cell to be x units each side, containing y x y x y box frame
+get modulus by looking at a LUT (very fast but not infinite world) *** INFINITE WORLD OBTAINED WITH MODULUS MODULE ONLY
+
 Then we can apply space repetition, as we have a perfectly periodic scene fitting in a cell
 We take the raytip of the world p, fold it to fit in the canonical cell,
 evaluate SDF at q (using periodicity) and march ray p.
 Folding : mapping p to nearest cell. SDF dist is valid everywhere, as neareast surf in real repeated world
 is always same as nearest surface in canonical cell, provided half_ext < cell_sz/2 (for box frame, for other scenes look at most protruding param)
 */
+
 
 module repeat_cell(
     input  logic        clk,

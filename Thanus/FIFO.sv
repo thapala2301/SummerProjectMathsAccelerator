@@ -4,7 +4,7 @@ Input data element and enable write read, output read data and empty/full flags
 */
 
 module FIFO #(
-    parameter WIDTH = 220,
+    parameter WIDTH = 247,
     parameter DEPTH = 128
 )(
     input  logic              clk,

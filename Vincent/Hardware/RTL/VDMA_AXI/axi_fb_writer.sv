@@ -20,6 +20,7 @@ module axi_fb_writer(
     input logic pix_done,
     input logic [19:0] out_pix_id,
     input logic [7:0] out_iter,
+    input logic [26:0] out_dist,
     input logic render_bank,
 
     //outupt axi4 write master AW chan, W chan, B chan DDR3 controller
@@ -64,16 +65,17 @@ logic rd_en;
 palette u_palette(
     .clk(clk), .rst_n(rst_n),
     .iter(out_iter),
+    .curr_dist(out_dist),
     .rgb(rgb_col)
 );
 
 logic [19:0] pix_id_d2;
 logic render_bank_d2;
-//palette takes 2 clk to output rgb_col, and its signal is needed for pixel_data
+//palette takes 3 clk to output rgb_col, and its signal is needed for pixel_data
 //we must delay the other signals pix_id and render_bank
-state_pipe #(.WIDTH(20), .DEPTH(2)) u_pipe_id   (.clk(clk), .in(out_pix_id),   .out(pix_id_d2));
-state_pipe #(.WIDTH(1),  .DEPTH(2)) u_pipe_bank (.clk(clk), .in(render_bank),  .out(render_bank_d2));
-state_pipe #(.WIDTH(1), .DEPTH(2)) u_pipe_pixdone (.clk(clk), .in(pix_done), .out(pix_done_d2));
+state_pipe #(.WIDTH(20), .DEPTH(3)) u_pipe_id   (.clk(clk), .in(out_pix_id),   .out(pix_id_d2));
+state_pipe #(.WIDTH(1),  .DEPTH(3)) u_pipe_bank (.clk(clk), .in(render_bank),  .out(render_bank_d2));
+state_pipe #(.WIDTH(1), .DEPTH(3)) u_pipe_pixdone (.clk(clk), .in(pix_done), .out(pix_done_d2));
 
 assign pixel_data = {pix_id_d2, render_bank_d2, rgb_col};
 assign BREADY = 1'b1;

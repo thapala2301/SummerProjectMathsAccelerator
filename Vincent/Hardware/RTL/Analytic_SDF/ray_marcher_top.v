@@ -98,6 +98,7 @@ wire [26:0] fc_dir_x_0, fc_dir_x_1;
 wire [26:0] fc_dir_y_0, fc_dir_y_1;
 wire [26:0] fc_dir_z_0, fc_dir_z_1;
 wire [7:0]  fc_iter_0, fc_iter_1;
+wire [26:0] fc_dist_0, fc_dist_1;
 wire        fc_valid_0, fc_valid_1;
 
 wire [19:0] mc_fb_pix_id_0, mc_fb_pix_id_1;
@@ -108,11 +109,13 @@ wire [26:0] mc_fb_dir_x_0, mc_fb_dir_x_1;
 wire [26:0] mc_fb_dir_y_0, mc_fb_dir_y_1;
 wire [26:0] mc_fb_dir_z_0, mc_fb_dir_z_1;
 wire [7:0]  mc_fb_iter_0, mc_fb_iter_1;
+wire [26:0] mc_fb_dist_0, mc_fb_dist_1;
 wire        mc_fb_valid_0, mc_fb_valid_1;
 
 wire        mc_pix_done_0, mc_pix_done_1;
 wire [19:0] mc_out_pix_id_0, mc_out_pix_id_1;
 wire [7:0]  mc_out_iter_0, mc_out_iter_1;
+wire [26:0] mc_out_dist_0, mc_out_dist_1;
 
 // --- end of specific march core signals
 
@@ -125,6 +128,7 @@ wire dispatch_pipeline_ready;
 wire arb_pix_done;
 wire [19:0] arb_out_pix_id;
 wire [7:0] arb_out_iter;
+wire [26:0] arb_out_dist;
 
 
 assign fc_stall_cur = (core_sel == 2'd0) ? fc_stall_0 : fc_stall_1;
@@ -182,7 +186,7 @@ pixel_dispatch inst1_px_disp(
 assign arb_pix_done   = mc_pix_done_0 | mc_pix_done_1;
 assign arb_out_pix_id = mc_pix_done_0 ? mc_out_pix_id_0 : mc_out_pix_id_1;
 assign arb_out_iter   = mc_pix_done_0 ? mc_out_iter_0   : mc_out_iter_1;
-
+assign arb_out_dist = mc_pix_done_0 ? mc_out_dist_0 : mc_out_dist_1;
 //no possible collision, cores are dispatches 1 clk apart. outputs arrive one clk apart
 //or is a safety net sorta
 axi_fb_writer inst_axi_writer(
@@ -190,6 +194,7 @@ axi_fb_writer inst_axi_writer(
     .pix_done(arb_pix_done),
     .out_pix_id(arb_out_pix_id),
     .out_iter(arb_out_iter),
+    .out_dist(arb_out_dist),
     .render_bank(render_bank),
     .AWADDR(M_AXI_AWADDR),   .AWVALID(M_AXI_AWVALID), .AWREADY(M_AXI_AWREADY),
     .WDATA(M_AXI_WDATA),     .WSTRB(M_AXI_WSTRB),
@@ -213,13 +218,16 @@ march_core inst0_mc(
     .in_ray_dir_y(fc_dir_y_0),
     .in_ray_dir_z(fc_dir_z_0),
     .in_iter(fc_iter_0),
+    .in_dist(fc_dist_0),
     .in_valid(fc_valid_0),
     .lookat(lookat),
     .cam_origin(cam_origin),
     .pix_done(mc_pix_done_0),
     .out_pix_id(mc_out_pix_id_0),
     .out_iter(mc_out_iter_0),
+    .out_dist (mc_out_dist_0),
     .fb_iter(mc_fb_iter_0),
+    .fb_dist(mc_fb_dist_0),
     .fb_ray_dir_x(mc_fb_dir_x_0),
     .fb_ray_dir_y(mc_fb_dir_y_0),
     .fb_ray_dir_z(mc_fb_dir_z_0),
@@ -243,13 +251,16 @@ march_core inst1_mc(
     .in_ray_dir_y(fc_dir_y_1),
     .in_ray_dir_z(fc_dir_z_1),
     .in_iter(fc_iter_1),
+    .in_dist(fc_dist_1),
     .in_valid(fc_valid_1),
     .lookat(lookat),
     .cam_origin(cam_origin),
     .pix_done(mc_pix_done_1),
     .out_pix_id(mc_out_pix_id_1),
     .out_iter(mc_out_iter_1),
+    .out_dist(mc_out_dist_1),
     .fb_iter(mc_fb_iter_1),
+    .fb_dist(mc_fb_dist_1),
     .fb_ray_dir_x(mc_fb_dir_x_1),
     .fb_ray_dir_y(mc_fb_dir_y_1),
     .fb_ray_dir_z(mc_fb_dir_z_1),
@@ -276,6 +287,7 @@ feedback_ctrl inst0_fb_ctrl(
     .fb_ray_dir_y({5'b0, mc_fb_dir_y_0}),
     .fb_ray_dir_z({5'b0, mc_fb_dir_z_0}),
     .fb_iteration_count(mc_fb_iter_0),
+    .fb_dist(mc_fb_dist_0),
     .fb_validity(mc_fb_valid_0),
     .pipeline_ready(1'b1),
     .out_x(fc_x_0),
@@ -288,6 +300,7 @@ feedback_ctrl inst0_fb_ctrl(
     .out_ray_dir_y(fc_dir_y_0),
     .out_ray_dir_z(fc_dir_z_0),
     .out_iteration_count(fc_iter_0),
+    .out_dist(fc_dist_0),
     .out_validity(fc_valid_0),
     .stall(fc_stall_0)
 );
@@ -307,6 +320,7 @@ feedback_ctrl inst1_fb_ctrl(
     .fb_ray_dir_y({5'b0, mc_fb_dir_y_1}),
     .fb_ray_dir_z({5'b0, mc_fb_dir_z_1}),
     .fb_iteration_count(mc_fb_iter_1),
+    .fb_dist(mc_fb_dist_1),
     .fb_validity(mc_fb_valid_1),
     .pipeline_ready(1'b1),
     .out_x(fc_x_1),
@@ -319,6 +333,7 @@ feedback_ctrl inst1_fb_ctrl(
     .out_ray_dir_y(fc_dir_y_1),
     .out_ray_dir_z(fc_dir_z_1),
     .out_iteration_count(fc_iter_1),
+    .out_dist(fc_dist_1),
     .out_validity(fc_valid_1),
     .stall(fc_stall_1)
 );

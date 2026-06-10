@@ -5,6 +5,8 @@ if e<0, number less than 1: floor is 0
 If e>=18, number is large int, no frac bits: floor = input unchanged
 If 0 <= e < 18: binary point sits in mantissa bits: zero out the bottom 18-e mantissa bits
 
+
+FIX FOR NEGATIVES ****
 */
 
 module fp_floor (

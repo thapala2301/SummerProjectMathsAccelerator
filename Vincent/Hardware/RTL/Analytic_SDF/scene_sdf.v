@@ -13,23 +13,32 @@ p.x = x component of p
 
 inputs: real world coordinates px,y,z
 output: sdf_out, using space repitition and scene geometry for SDF
+
+Need space repetition:
+With modulus, we can apply space repetition, as we have a perfectly periodic scene fitting in a cell
+We take the raytip of the world p, fold it to fit in the canonical cell,
+evaluate SDF at q (using periodicity) and march ray p.
+Folding : mapping p to nearest cell. SDF dist is valid everywhere, as neareast surf in real repeated world
+is always same as nearest surface in canonical cell, provided half_ext < cell_sz/2 (for box frame, for other scenes look at most protruding param)
 */
+
 module scene_sdf(
     input clk,
     input [26:0] px, py, pz,
     output reg [26:0] sdf_out
 );
 
- wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000}; // 4.5
+wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000}; // 4.5
 wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD}; // 0.15
 
 //b : half extent of box, e : edge thickness
 
-//obtain the coordinates in canonical cell for SDF computation
+//obtain the coordinates in canonical cell for SDF computation- space repetition
+localparam cell_sz  = 27'h2090000; //=10 in FP. TEMP. CHANGE TO INPUT FROM AXI WHEN MUSIC REACTIVE
 wire [26:0] rep_px, rep_py, rep_pz;
-repeat_cell inst_repeat_x(.clk(clk), .p(px), .q(rep_px));
-repeat_cell inst_repeat_y(.clk(clk), .p(py), .q(rep_py));
-repeat_cell inst_repeat_z(.clk(clk), .p(pz), .q(rep_pz));
+fp_modulus inst_repeat_x(.clk(clk), .a(px), .b(cell_sz), .rem(rep_px));
+fp_modulus inst_repeat_y(.clk(clk), .a(py), .b(cell_sz), .rem(rep_py));
+fp_modulus inst_repeat_z(.clk(clk), .a(pz), .b(cell_sz), .rem(rep_pz));
 
 //Stage A: p = abs(p) - b;
 wire [26:0] abs_px, abs_py, abs_pz, px_intermed, py_intermed, pz_intermed, px_intermed2, py_intermed2, pz_intermed2, temp_add_px, temp_add_py, temp_add_pz, qx, qy, qz;

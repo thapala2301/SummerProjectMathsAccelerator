@@ -28,6 +28,7 @@ module feedback_ctrl (
     input logic [31:0] fb_ray_dir_y,
     input logic [31:0] fb_ray_dir_z,
     input logic [7:0]  fb_iteration_count,
+    input logic [26:0] fb_dist, 
     input logic        fb_validity,
 
     input logic        pipeline_ready,
@@ -43,6 +44,7 @@ module feedback_ctrl (
     output logic [26:0] out_ray_dir_y,
     output logic [26:0] out_ray_dir_z,
     output logic [7:0]  out_iteration_count, //how many steps so far
+    output logic [26:0] out_dist, //distance so far
     output logic        out_validity, //whether output is valid ray to process
 
     output logic        stall //backpressure for dispatch
@@ -50,13 +52,13 @@ module feedback_ctrl (
 
     //pix id: 20 bits, pos_x,y,z: 27*3==81 bits, dir_x,y,z = 27*3 = 81 bits, iter count : 8 bits
     //total 190 bits, each FIFO entry holds all these entries needed to resume a ray mid marching
-    logic [189:0] fifo_rd_data; 
+    logic [216:0] fifo_rd_data; 
     logic         fifo_full;
     logic         fifo_empty;
 
     //fifo inst
     FIFO #(
-        .WIDTH(190),
+        .WIDTH(217),
         .DEPTH(128)
     ) fifo_inst (
         .clk(clk),
@@ -64,7 +66,7 @@ module feedback_ctrl (
         .wr_en(fb_validity),
         .wr_data({fb_pix_id, fb_pos_x[26:0], fb_pos_y[26:0], fb_pos_z[26:0],
                   fb_ray_dir_x[26:0], fb_ray_dir_y[26:0], fb_ray_dir_z[26:0],
-                  fb_iteration_count}),
+                  fb_iteration_count, fb_dist}),
         .rd_en(pipeline_ready && !fifo_empty),
         .rd_data(fifo_rd_data),
         .FIFO_FULL(fifo_full),
@@ -85,20 +87,22 @@ module feedback_ctrl (
             out_ray_dir_y       <= 1'b0;
             out_ray_dir_z       <= 1'b0;
             out_iteration_count <= 1'b0;
+            out_dist <= 1'b0;
             out_validity        <= 1'b0;
         end
         else if (!fifo_empty && pipeline_ready) begin
             //existing pixel (already marched) dispatch
             out_x               <= 1'b0; //0 placeholder for X/don't care: we have already marched the ray so don't care about initial pos on screen
             out_y               <= 1'b0;
-            out_pix_id          <= fifo_rd_data[189:170]; //send the actual data to continue marching
-            out_pos_x           <= fifo_rd_data[169:143];
-            out_pos_y           <= fifo_rd_data[142:116];
-            out_pos_z           <= fifo_rd_data[115:89];
-            out_ray_dir_x       <= fifo_rd_data[88:62];
-            out_ray_dir_y       <= fifo_rd_data[61:35];
-            out_ray_dir_z       <= fifo_rd_data[34:8];
-            out_iteration_count <= fifo_rd_data[7:0];
+            out_pix_id          <= fifo_rd_data[216:197]; //send the actual data to continue marching
+            out_pos_x           <= fifo_rd_data[196:170];
+            out_pos_y           <= fifo_rd_data[169:143];
+            out_pos_z           <= fifo_rd_data[142:116];
+            out_ray_dir_x       <= fifo_rd_data[115:89];
+            out_ray_dir_y       <= fifo_rd_data[88:62];
+            out_ray_dir_z       <= fifo_rd_data[61:35];
+            out_iteration_count <= fifo_rd_data[34:27];
+            out_dist <= fifo_rd_data[26:0];
             out_validity        <= 1'b1;
         end
         else if (fifo_empty && pipeline_ready && valid) begin
@@ -113,6 +117,7 @@ module feedback_ctrl (
             out_ray_dir_y       <= 1'b0;
             out_ray_dir_z       <= 1'b0;
             out_iteration_count <= 1'b0;
+            out_dist <= 1'b0;
             out_validity        <= 1'b1;
         end
         else begin

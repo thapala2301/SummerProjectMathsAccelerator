@@ -1,8 +1,6 @@
 module march_core(
-
     input logic clk,
     input logic rst_n,
-
     //from feedback_ctrl
     input logic [10:0] in_x,
     input logic [9:0]in_y,
@@ -14,18 +12,17 @@ module march_core(
     input logic [26:0]in_ray_dir_y,
     input logic [26:0]in_ray_dir_z,
     input logic [7:0]in_iter,
+    input logic [26:0] in_dist, //current dist marched by ray
     input logic in_valid,
-
     //from axi_camera_regs
     input logic  [26:0]lookat [0:8],
     input logic [26:0] cam_origin [0:2],
-
     //OBSOLETE?
     //output to fb_write
     output logic pix_done,
     output logic [19:0]out_pix_id,
     output logic [7:0]out_iter ,
-
+    output logic [26:0] out_dist, //gives curr dist back to axi fsm if wire marched fully
     //output to feedback_ctrl
     output logic [7:0]fb_iter,
     output logic [26:0]fb_ray_dir_x,
@@ -35,14 +32,13 @@ module march_core(
     output logic [26:0]fb_pos_y,
     output logic [26:0]fb_pos_z,
     output logic [19:0]fb_pix_id,
+    output logic [26:0] fb_dist, //give curr dist back to feedback control
     output logic fb_valid
 );
 
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
 localparam MAX_ITER = 128;
-
-
-
+localparam [26:0] FP_ZERO = 27'h0; // = 0 in FP
 //stage 1: ray gen, rg_lat = 48
 logic [26:0] rg_dir[0:2];
 logic [26:0] rg_orig[0:2];
@@ -73,6 +69,7 @@ ray_gen #(
     .pipeline_ready()
 );
 
+//unpack array
 wire[26:0] rg_dir_x=rg_dir[0];
 wire[26:0] rg_dir_y=rg_dir[1];
 wire[26:0] rg_dir_z=rg_dir[2];
@@ -80,8 +77,10 @@ wire[26:0] rg_dir_z=rg_dir[2];
 logic [26:0] d1_pos_x, d1_pos_y, d1_pos_z, d1_dir_x, d1_dir_y, d1_dir_z;
 logic [26:0] s1_pos_x, s1_pos_y, s1_pos_z, s1_dir_x, s1_dir_y, s1_dir_z;
 logic [7:0] d1_iter;
+logic [26:0] d1_dist;
 logic [19:0] d1_pix_id;
 logic [7:0] s1_iter;
+logic [26:0] s1_dist;
 logic [19:0] s1_pix_id;
 logic s1_valid;
 state_pipe #(.WIDTH(27), .DEPTH(RG_LAT)) inst1_in_pos_x (.clk(clk), .in(in_pos_x), .out(d1_pos_x));
@@ -93,6 +92,7 @@ state_pipe #(.WIDTH(27), .DEPTH(RG_LAT)) inst1_in_dir_y(.clk(clk), .in(in_ray_di
 state_pipe #(.WIDTH(27), .DEPTH(RG_LAT)) inst1_in_dir_z(.clk(clk), .in(in_ray_dir_z), .out(d1_dir_z));
 
 state_pipe #(.WIDTH(8), .DEPTH(RG_LAT)) inst1_in_iter(.clk(clk), .in(in_iter), .out(d1_iter));
+state_pipe #(.WIDTH(27), .DEPTH(RG_LAT)) inst1_in_dist(.clk(clk), .in(in_dist), .out(d1_dist));
 state_pipe #(.WIDTH(20), .DEPTH(RG_LAT)) inst1_in_pix_id(.clk(clk), .in(in_pix_id), .out(d1_pix_id));
 
 //if iter is 0, direction is rg output and pos is camera origin
@@ -103,6 +103,7 @@ wire [26:0] s1_pos_z_comb = (d1_iter == 8'd0) ? rg_orig[2] : d1_pos_z;
 wire [26:0] s1_dir_x_comb = (d1_iter == 8'd0) ? rg_dir[0]  : d1_dir_x;
 wire [26:0] s1_dir_y_comb = (d1_iter == 8'd0) ? rg_dir[1]  : d1_dir_y;
 wire [26:0] s1_dir_z_comb = (d1_iter == 8'd0) ? rg_dir[2]  : d1_dir_z;
+wire [26:0] s1_dist_comb = (d1_iter == 8'd0) ? FP_ZERO  : d1_dist;
 wire [26:0] s1_is_new_ray_comb = (d1_iter==8'd0);
 
 always_ff @ (posedge clk) begin
@@ -115,14 +116,15 @@ always_ff @ (posedge clk) begin
     s1_is_new_ray <= s1_is_new_ray_comb;
     s1_valid     <= s1_is_new_ray_comb ? rg_valid  : d1_valid;
     s1_iter      <= d1_iter;
+    s1_dist <= s1_dist_comb;
     s1_pix_id    <= s1_is_new_ray_comb ? rg_pix_id : d1_pix_id;
 end
 
 state_pipe #(.WIDTH(1), .DEPTH(RG_LAT)) inst1_in_valid(.clk(clk), .in(in_valid), .out(d1_valid));
 
 
-//Stage 2: scene_sdf, 55 clk delay pipeline on 150Mhz
-localparam SDF_LAT=55;
+//Stage 2: scene_sdf, 103 clk delay pipeline on 150Mhz FOR MODULUS VERSION. IF USING LUT BASED MOD SWITCH TO 44 CLK
+localparam SDF_LAT=103;
 logic [26:0] sdf_dist;
 scene_sdf inst1_scene_sdf(
     .clk(clk),
@@ -132,9 +134,9 @@ scene_sdf inst1_scene_sdf(
     .sdf_out(sdf_dist)
 );
 
-//wire [26:0] sdf_dist = 27'h1FC0000; // constant 1.0
 logic [26:0] d2_pos_x, d2_pos_y, d2_pos_z, d2_dir_x, d2_dir_y, d2_dir_z;
 logic [7:0] d2_iter;
+logic [26:0] d2_dist;
 logic [19:0] d2_pix_id;
 logic d2_valid;
 
@@ -146,26 +148,31 @@ state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_x(.clk(clk), .in(s1_dir_x
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_y(.clk(clk), .in(s1_dir_y), .out(d2_dir_y));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_z(.clk(clk), .in(s1_dir_z), .out(d2_dir_z));
 state_pipe #(.WIDTH(8), .DEPTH(SDF_LAT)) inst1_d2_iter(.clk(clk), .in(s1_iter), .out(d2_iter));
+state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dist(.clk(clk), .in(s1_dist), .out(d2_dist));
 state_pipe #(.WIDTH(20), .DEPTH(SDF_LAT)) inst1_d2_pix_id(.clk(clk), .in(s1_pix_id), .out(d2_pix_id));
 state_pipe #(.WIDTH(1), .DEPTH(SDF_LAT)) inst1_d2_valid(.clk(clk), .in(s1_valid), .out(d2_valid));
 
 //Stage 3: step forward after computing sdf
 //sdf_dist * dir for xyz
 logic [26:0] step_x, step_y, step_z;
+logic [26:0] new_dist;
 
 //fp mul 4 clk delay
-fp_mul inst1_mul_x (.clk(clk), .a(sdf_dist), .b(d2_dir_x), .out(step_x));
+//move sdf dist everywhere because we march in radius of sphere (avoid colision)
+fp_mul inst1_mul_x (.clk(clk), .a(sdf_dist), .b(d2_dir_x), .out(step_x)); 
 fp_mul inst1_mul_y (.clk(clk), .a(sdf_dist), .b(d2_dir_y), .out(step_y));
 fp_mul inst1_mul_z (.clk(clk), .a(sdf_dist), .b(d2_dir_z), .out(step_z));
 
-//then do total dist = curr dist + sdf_dist*dir
+//then do total dist = total_dist + sdf_dist
+fp_add u_addtotaldist(.clk(clk), .a(d2_dist), .b(sdf_dist), .out(new_dist));
 //fp add 4 clk delay ON 150MHZ
 
 //while d2_pos_x,y,z is available NOW, step_x,y,z still needs 4 clk to be computed, so delay d2_pos_x,y,z by 4 clk
-logic [26:0] new_pos_x, new_pos_y, new_pos_z, d2_pos_x_d, d2_pos_y_d, d2_pos_z_d;
+logic [26:0] new_dist_d, new_pos_x, new_pos_y, new_pos_z, d2_pos_x_d, d2_pos_y_d, d2_pos_z_d;
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_x_d(.clk(clk), .in(d2_pos_x), .out(d2_pos_x_d));
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_y_d(.clk(clk), .in(d2_pos_y), .out(d2_pos_y_d));
 state_pipe #(.WIDTH(27), .DEPTH(4)) inst1_d2_pos_z_d(.clk(clk), .in(d2_pos_z), .out(d2_pos_z_d));
+state_pipe #(.WIDTH(27), .DEPTH(4)) inst_new_dist_d(.clk(clk), .in(new_dist), .out(new_dist_d));
 
 //march the ray in all 3 directions: compute new position, using newpos = old pos + step along x,y,z
 fp_add inst1_add_x(.clk(clk), .a(d2_pos_x_d), .b(step_x), .out(new_pos_x));
@@ -204,6 +211,8 @@ always_ff @ (posedge clk) begin
     fb_valid     <= d3_valid & ~done_comb; //if set, ray is not done yet, must feed back for another march iteration
     out_pix_id   <= d3_pix_id;
     out_iter     <= d3_iter;
+    fb_dist <= new_dist_d;
+    out_dist <= new_dist_d;
 end
 
 endmodule
