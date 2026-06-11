@@ -29,14 +29,32 @@ module ray_marcher_top (
     input wire [1:0] M_AXI_BRESP,
 
     //AXI LITE SIGNALS FOR interactivity of scene
-    input wire [5:0] s_axi_awaddr,
+    //MASTER: PS. Initiates all transactions, writes cam/sdf data
+    //SLAVE : axi_camera_regs: recieves writes, stores in regfile. top wraps the slave
+    input wire [6:0] s_axi_awaddr,
     input wire s_axi_awvalid,
-    input wire s_axi_awready,
+    output wire s_axi_awready, 
+
     input wire [31:0] s_axi_wdata,
     input wire [3:0] s_axi_wstrb,
     input wire s_axi_wvalid,
-    input wire s_axi_wready,
-    input wire s_axi_bresp, s_axi_bvalid, s_axi_brready
+    output wire s_axi_wready,
+
+    input wire [6:0] s_axi_araddr,
+    input wire s_axi_arvalid,
+    output wire s_axi_arready, //consumer in transaction. Output from the slave axi_camera_regs
+
+    //slave sends data back
+    output logic [31:0] s_axi_rdata,
+    output logic [1:0] s_axi_rresp,
+    output logic s_axi_rvalid,
+    input logic s_axi_rready,
+
+    //B channel: write response, slave confirms write completes. Slave: PL. Master : PS
+    output wire [1:0] s_axi_bresp, 
+    output wire s_axi_bvalid, 
+    input wire s_axi_bready //bready goes from PS to PL: master says it recieved the response
+
 );
 
 wire rst;
@@ -49,28 +67,26 @@ localparam [26:0] FP_P015    = 27'h1F0CCCD;
 localparam [26:0] FP_P45     = 27'h2048000;
 
 wire [26:0] lookat[0:8];
-reg [26:0] cam_origin[0:2];
-wire [26:0] cell_sz, f_fp, e_fp;
+wire [26:0] cam_origin[0:2];
+wire [26:0] sdf_params [0:7];
+//wire [26:0] cell_sz, f_fp, e_fp;
 
 
 axi_camera_regs inst_cam_regs (
     .aclk(sys_clk), .aresetn(rst_n),
     .s_axi_awaddr(s_axi_awaddr), .s_axi_awvalid(s_axi_awvalid),
-    .s_axi_awready(s_axi_awready), .s_axi_wdata(s_axi_wdata),
-    .s_axi_wstrb(s_axi_wstrb), .s_axi_wvalid(s_axi_wvalid), 
-    .s_axi_wready(s_axi_wready),
-    
+    .s_axi_awready(s_axi_awready), 
+    .s_axi_wvalid(s_axi_wvalid), 
+    .s_axi_wready(s_axi_wready), .s_axi_wdata(s_axi_wdata),
+    .s_axi_wstrb(s_axi_wstrb),
+    .s_axi_bresp(s_axi_bresp),
+    .s_axi_bvalid(s_axi_bvalid), .s_axi_bready(s_axi_bready),
+    .s_axi_araddr(s_axi_araddr), .s_axi_arvalid(s_axi_arvalid),
+    .s_axi_arready(s_axi_arready), .s_axi_rdata(s_axi_rdata),
+    .s_axi_rresp(s_axi_rresp), .s_axi_rvalid(s_axi_rvalid),
+    .s_axi_rready(s_axi_rready), .lookat(lookat),
+    .cam_origin(cam_origin), .sdf_params(sdf_params)
 );
-
-assign lookat[0] = FP_ONE;
-assign lookat[1] = FP_ZERO;
-assign lookat[2] = FP_ZERO;
-assign lookat[3] = FP_ZERO;
-assign lookat[4] = FP_ONE;
-assign lookat[5] = FP_ZERO;
-assign lookat[6] = FP_ZERO;
-assign lookat[7] = FP_ZERO;
-assign lookat[8] = FP_NEG_ONE;
 
 
 //assign cam_origin[2] = FP_P45;
@@ -232,7 +248,8 @@ march_core inst0_mc(
     .fb_pos_y(mc_fb_pos_y_0),
     .fb_pos_z(mc_fb_pos_z_0),
     .fb_pix_id(mc_fb_pix_id_0),
-    .fb_valid(mc_fb_valid_0)
+    .fb_valid(mc_fb_valid_0),
+    .sdf_params(sdf_params)
 );
 
 march_core inst1_mc(
@@ -265,7 +282,8 @@ march_core inst1_mc(
     .fb_pos_y(mc_fb_pos_y_1),
     .fb_pos_z(mc_fb_pos_z_1),
     .fb_pix_id(mc_fb_pix_id_1),
-    .fb_valid(mc_fb_valid_1)
+    .fb_valid(mc_fb_valid_1),
+    .sdf_params(sdf_params)
 );
 
 //2 feedback ctrl instance

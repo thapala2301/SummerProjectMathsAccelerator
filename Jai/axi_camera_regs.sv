@@ -10,7 +10,7 @@ as well as AXILite transaction signals
 
 module axi_camera_regs #(
     parameter int DATA_W = 32,
-    parameter int ADDR_W = 6
+    parameter int ADDR_W = 7
 ) (
     input logic aclk,
     input logic aresetn,
@@ -160,7 +160,7 @@ module axi_camera_regs #(
             if (s_axi_arvalid && s_axi_arready) begin
                 automatic int ridx = int'(s_axi_araddr[ADDR_W-1:2]);
                 //output the read data from reg file iff is contained in [0:11] elements
-                s_axi_rdata <= (ridx < 12) ? regfile[ridx] : '0;
+                s_axi_rdata <= (ridx < 20) ? regfile[ridx] : '0;
                 s_axi_rvalid <= 1'b1;
             end
             //if read transaction done

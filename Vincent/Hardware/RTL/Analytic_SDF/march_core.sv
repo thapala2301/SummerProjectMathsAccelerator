@@ -36,8 +36,8 @@ module march_core(
     output logic fb_valid,
 
     //scene dependent params
-    input logic [26:0] b_fp, e_fp, cell_sz
-);
+    input logic [26:0] sdf_params [0:7]
+    );
 
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
 localparam MAX_ITER = 128;
@@ -127,18 +127,15 @@ state_pipe #(.WIDTH(1), .DEPTH(RG_LAT)) inst1_in_valid(.clk(clk), .in(in_valid),
 
 
 //Stage 2: scene_sdf, 103 clk delay pipeline on 150Mhz FOR MODULUS VERSION. IF USING LUT BASED MOD SWITCH TO 44 CLK
-localparam SDF_LAT=103;
+localparam SDF_LAT=107;
 logic [26:0] sdf_dist;
-scene_sdf inst1_scene_sdf(
+scaffold_sdf inst1_scene_sdf(
     .clk(clk),
     .px(s1_pos_x),
     .py(s1_pos_y),
     .pz(s1_pos_z),
-    .b_fp(b_fp),
-    .e_fp(e_fp),
-    .cell_sz(cell_sz),
+    .sdf_params(sdf_params),
     .sdf_out(sdf_dist)
-
 );
 
 logic [26:0] d2_pos_x, d2_pos_y, d2_pos_z, d2_dir_x, d2_dir_y, d2_dir_z;

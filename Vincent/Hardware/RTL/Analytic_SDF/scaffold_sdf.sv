@@ -22,10 +22,10 @@ Folding : mapping p to nearest cell. SDF dist is valid everywhere, as neareast s
 is always same as nearest surface in canonical cell, provided half_ext < cell_sz/2 (for box frame, for other scenes look at most protruding param)
 */
 
-module scene_sdf(
+module scaffold_sdf(
     input clk,
     input wire [26:0] px, py, pz,
-    input wire [26:0] b_fp, e_fp, cell_sz,
+    input logic [26:0] sdf_params [0:7],
     output reg [26:0] sdf_out
 );
 
@@ -36,6 +36,10 @@ module scene_sdf(
 
 //obtain the coordinates in canonical cell for SDF computation- space repetition
 // localparam cell_sz  = 27'h2090000; //=10 in FP. TEMP. CHANGE TO INPUT FROM AXI WHEN MUSIC REACTIVE
+logic [26:0] cell_sz, b_fp, e_fp;
+assign cell_sz = sdf_params[0];
+assign b_fp = sdf_params[1];
+assign e_fp = sdf_params[2];
 wire [26:0] rep_px, rep_py, rep_pz;
 fp_modulus inst_repeat_x(.clk(clk), .a(px), .b(cell_sz), .rem(rep_px));
 fp_modulus inst_repeat_y(.clk(clk), .a(py), .b(cell_sz), .rem(rep_py));
