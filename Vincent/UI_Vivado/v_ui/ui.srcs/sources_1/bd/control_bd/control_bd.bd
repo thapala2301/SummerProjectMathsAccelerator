@@ -785,10 +785,10 @@
             "value": "1344"
           },
           "GEN_HSYNC_END": {
-            "value": "1204"
+            "value": "1224"
           },
           "GEN_HSYNC_START": {
-            "value": "1184"
+            "value": "1104"
           },
           "GEN_VACTIVE_SIZE": {
             "value": "600"
@@ -1040,16 +1040,46 @@
       }
     },
     "interface_nets": {
-      "smartconnect_vdma_M00_AXI": {
+      "smartconnect_0_M03_AXI": {
         "interface_ports": [
-          "processing_system7_0/S_AXI_HP1",
-          "smartconnect_vdma/M00_AXI"
+          "smartconnect_0/M03_AXI",
+          "axi_gpio_1/S_AXI"
+        ]
+      },
+      "smartconnect_0_M02_AXI": {
+        "interface_ports": [
+          "smartconnect_0/M02_AXI",
+          "axi_gpio_0/S_AXI"
+        ]
+      },
+      "v_tc_0_vtiming_out": {
+        "interface_ports": [
+          "v_tc_0/vtiming_out",
+          "v_axi4s_vid_out_0/vtiming_in"
+        ]
+      },
+      "processing_system7_0_M_AXI_GP0": {
+        "interface_ports": [
+          "smartconnect_0/S00_AXI",
+          "processing_system7_0/M_AXI_GP0"
+        ]
+      },
+      "smartconnect_fb_M00_AXI": {
+        "interface_ports": [
+          "smartconnect_fb/M00_AXI",
+          "processing_system7_0/S_AXI_HP0"
         ]
       },
       "axi_vdma_0_M_AXIS_MM2S": {
         "interface_ports": [
           "axi_vdma_0/M_AXIS_MM2S",
           "axis_subset_converter_0/S_AXIS"
+        ]
+      },
+      "smartconnect_vdma_M00_AXI": {
+        "interface_ports": [
+          "processing_system7_0/S_AXI_HP1",
+          "smartconnect_vdma/M00_AXI"
         ]
       },
       "smartconnect_0_M01_AXI": {
@@ -1076,12 +1106,6 @@
           "smartconnect_vdma/S00_AXI"
         ]
       },
-      "processing_system7_0_DDR": {
-        "interface_ports": [
-          "DDR",
-          "processing_system7_0/DDR"
-        ]
-      },
       "axis_subset_converter_0_M_AXIS": {
         "interface_ports": [
           "axis_subset_converter_0/M_AXIS",
@@ -1094,34 +1118,10 @@
           "processing_system7_0/FIXED_IO"
         ]
       },
-      "processing_system7_0_M_AXI_GP0": {
+      "processing_system7_0_DDR": {
         "interface_ports": [
-          "smartconnect_0/S00_AXI",
-          "processing_system7_0/M_AXI_GP0"
-        ]
-      },
-      "v_tc_0_vtiming_out": {
-        "interface_ports": [
-          "v_tc_0/vtiming_out",
-          "v_axi4s_vid_out_0/vtiming_in"
-        ]
-      },
-      "smartconnect_0_M03_AXI": {
-        "interface_ports": [
-          "smartconnect_0/M03_AXI",
-          "axi_gpio_1/S_AXI"
-        ]
-      },
-      "smartconnect_0_M02_AXI": {
-        "interface_ports": [
-          "smartconnect_0/M02_AXI",
-          "axi_gpio_0/S_AXI"
-        ]
-      },
-      "smartconnect_fb_M00_AXI": {
-        "interface_ports": [
-          "smartconnect_fb/M00_AXI",
-          "processing_system7_0/S_AXI_HP0"
+          "DDR",
+          "processing_system7_0/DDR"
         ]
       }
     },
