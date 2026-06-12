@@ -19,7 +19,6 @@ HSIZE = WIDTH * BYTES_PER_PIXEL
 
 CAMERA_PACKET_BYTES = 48
 TCP_PORT = 9999
-SHIFT_PX = 0   # set to match selector.py SHIFT_PX — shifts framebuffer origin to correct monitor's right-shift
 
 FRAME_BASE0_REG = 12 * 4
 FRAME_BASE1_REG = 13 * 4
@@ -268,8 +267,8 @@ def run(stop_event=None):
     frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
     frame0[:] = 0x00FFFFFF  # white — confirms display is working
     frame1[:] = 0x00FFFFFF
-    frame0_addr = phys_addr(frame0) + SHIFT_PX * 4
-    frame1_addr = phys_addr(frame1) + SHIFT_PX * 4
+    frame0_addr = phys_addr(frame0)
+    frame1_addr = phys_addr(frame1)
 
     # Write frame bases first — ray marcher starts on bitstream load and will
     # deadlock if it tries to write to address 0 (register reset value).

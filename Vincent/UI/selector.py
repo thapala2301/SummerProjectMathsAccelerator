@@ -44,7 +44,6 @@ HIGHLIGHT_X  = (55, 290)
 HIGHLIGHT_H  = 20
 MUSIC_BOX    = (330, 85, 770, 150)
 LONG_PRESS_S = 0.5
-SHIFT_PX = 0   # set to match ctrl.py SHIFT_PX — pixels to roll left to correct monitor's right-shift
 
 
 def _to_uint32(img_array):
@@ -63,10 +62,7 @@ def render_frame(base, selected, music_on, framebuf):
     if OPTIONS[selected][2]:
         color = (255, 50, 200) if music_on else (180, 60, 60)
         draw.rectangle(MUSIC_BOX, outline=color, width=3)
-    pixels = _to_uint32(np.array(img))
-    if SHIFT_PX:
-        pixels = np.roll(pixels, -SHIFT_PX, axis=1)
-    framebuf[:] = pixels
+    framebuf[:] = _to_uint32(np.array(img))
 
 
 def run_selector(framebuf):
