@@ -118,7 +118,7 @@ def _init_vdma(frame0, frame1):
     vdma.write(0x50, HEIGHT)
 
 
-def pl_hdmi_load(bitfile, min_dark_sec=5.0):
+def pl_hdmi_load(bitfile, min_dark_sec=0):
     """Kill HDMI, load bitfile, and guarantee at least min_dark_sec of no signal.
 
     The Overlay() call itself takes ~3-5s, so we overlap the kill timer with the
@@ -127,20 +127,20 @@ def pl_hdmi_load(bitfile, min_dark_sec=5.0):
     FCLK0 is restored by Overlay() HWH parsing (ui.bit) or manually (SDF).
     """
     MMIO(0x43000000, 0x10000).write(0x00, 0x00)  # stop VDMA
-    time.sleep(0.2)                                # let AXI bus go idle
+    time.sleep(0.01)                               # let VDMA burst drain (~2ms max)
     Clocks.fclk0_mhz = 15.0                       # clk_wiz loses lock → HDMI drops
     t0 = time.monotonic()
     ol = Overlay(bitfile)
     remaining = min_dark_sec - (time.monotonic() - t0)
     if remaining > 0:
-        time.sleep(remaining)                      # pad only if Overlay() was faster
+        time.sleep(remaining)
     return ol
 
 
 def start_ui_vdma(ol=None):
     if ol is None:
         ol = Overlay("ui.bit")
-    time.sleep(0.1)   # clk_wiz re-lock time after PYNQ restores FCLK0 from HWH
+    time.sleep(0.05)  # clk_wiz re-lock time after PYNQ restores FCLK0 from HWH
     frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
     frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
     frame0[:] = 0

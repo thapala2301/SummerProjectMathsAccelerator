@@ -290,7 +290,6 @@ def run(stop_event=None):
         time.sleep(0.005)
 
     init_vdma(vdma, frame0_addr, frame1_addr)
-    time.sleep(3.0)   # VDMA running stable black — monitor completes its lock cycle
     vdma_sr = vdma.read(MM2S_DMASR)
     print(f"FRAME0=0x{frame0_addr:08x} FRAME1=0x{frame1_addr:08x}")
     print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")
