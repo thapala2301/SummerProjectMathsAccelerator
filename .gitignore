@@ -23,3 +23,8 @@ Charlie/hdmi_working_camera_bram/.Xil/
 Charlie/hdmi_working_camera_ddr/.Xil/
 Charlie/hdmi_working_camera_bram/__pycache__/
 Charlie/hdmi_working_camera_ddr/__pycache__/
+Charlie/hdmi_working_ddr_double_buf/v/
+Charlie/hdmi_working_ddr_double_buf/vivado/
+Charlie/hdmi_working_ddr_double_buf/myproj/
+Charlie/hdmi_working_ddr_double_buf/.Xil/
+Charlie/hdmi_working_ddr_double_buf/__pycache__/
