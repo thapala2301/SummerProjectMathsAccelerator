@@ -139,9 +139,9 @@ control_bd_wrapper inst_ps_bd (
     .frame_base_0         (),
     .frame_base_1         (),
     // EMIO buttons
-    .GPIO_0_tri_i         (btns),
-    .GPIO_0_tri_o         (),
-    .GPIO_0_tri_t         ()
+    .GPIO_0_TRI_I         (btns),
+    .GPIO_0_TRI_O         (),
+    .GPIO_0_TRI_T         ()
 );
 
 rgb2dvi_0 inst_rgb2dvi (

@@ -16,7 +16,8 @@ set rtl_files [list \
 ]
 
 add_files -norecurse $rtl_files
-add_files -norecurse [file normalize "$origin_dir/ip/rgb2dvi_0/rgb2dvi_0.xci"]
+create_ip -name rgb2dvi -vendor digilentinc.com -library ip -module_name rgb2dvi_0
+generate_target all [get_files [get_property IP_FILE [get_ips rgb2dvi_0]]]
 add_files -fileset constrs_1 -norecurse [file normalize "$origin_dir/constraints/pynq_z1_ui.xdc"]
 
 create_ip -name clk_wiz -vendor xilinx.com -library ip -version 6.0 -module_name clk_wiz_0
