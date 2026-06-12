@@ -2,15 +2,26 @@
 SCRIPT FOR PYNQ BOARD: OVERLAY + IMU TO DETERMINE LOOKAT MATRIX
 Gets IMU values, computes lookat from this
 Also gets audio data from computer via TCP
+BTN1 (AXI GPIO 0x41210000 bit 0) returns to UI selector
 '''
 import socket
 import struct
 import threading
+import time
 import numpy as np
 from pynq import Overlay, MMIO
 
 AXI_BASE_ADDR = 0x43C00000
 AXI_SPAN      = 0x1000
+
+BTN_BASE_ADDR = 0x41210000
+BTN_SPAN      = 0x1000
+
+def _has_btn_gpio(overlay, addr):
+    for ip in overlay.ip_dict.values():
+        if ip.get('phys_addr') == addr:
+            return True
+    return False
 
 def fp32_to_fp27(value):
     bits       = struct.unpack(">I", struct.pack(">f", float(value)))[0]
@@ -67,15 +78,27 @@ def imu_thread(mmio):
 
 stop_event = threading.Event()
 
-def run(music_on=True):
+def btn_thread(btn_mmio):
+    while not stop_event.is_set():
+        if btn_mmio.read(0x0) & 0x1:   # BTN1 — back to UI
+            stop_event.set()
+            return
+        time.sleep(0.05)
+
+def run(music_on=True, overlay=None):
     mmio = MMIO(AXI_BASE_ADDR, AXI_SPAN)
     write_default_camera(mmio)
+    if overlay is not None and _has_btn_gpio(overlay, BTN_BASE_ADDR):
+        btn_mmio = MMIO(BTN_BASE_ADDR, BTN_SPAN)
+        tb = threading.Thread(target=btn_thread, args=(btn_mmio,), daemon=True)
+        tb.start()
+    else:
+        print("No button GPIO in this bitstream — press Ctrl+C to return to UI")
     if music_on:
         t = threading.Thread(target=tcp_thread, args=(mmio,), daemon=True)
         t.start()
     imu_thread(mmio)
-    input("Press Enter to stop...")
-    stop_event.set()
+    stop_event.wait()       # blocks until BTN1 pressed (btn_thread sets it)
     stop_event.clear()
 
 if __name__ == "__main__":

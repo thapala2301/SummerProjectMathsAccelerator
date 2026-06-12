@@ -19,6 +19,7 @@ HSIZE = WIDTH * BYTES_PER_PIXEL
 
 CAMERA_PACKET_BYTES = 48
 TCP_PORT = 9999
+SHIFT_PX = 0   # set to match selector.py SHIFT_PX — shifts framebuffer origin to correct monitor's right-shift
 
 FRAME_BASE0_REG = 12 * 4
 FRAME_BASE1_REG = 13 * 4
@@ -257,6 +258,69 @@ def main():
         frame0.freebuffer()
         frame1.freebuffer()
 
+
+def run(stop_event=None):
+    camera_regs = MMIO(CAMERA_REG_BASE, SPAN)
+    vdma        = MMIO(VDMA_BASE, SPAN)
+    gpio        = MMIO(GPIO_BASE, SPAN)
+
+    frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame0[:] = 0x00FFFFFF  # white — confirms display is working
+    frame1[:] = 0x00FFFFFF
+    frame0_addr = phys_addr(frame0) + SHIFT_PX * 4
+    frame1_addr = phys_addr(frame1) + SHIFT_PX * 4
+
+    # Write frame bases first — ray marcher starts on bitstream load and will
+    # deadlock if it tries to write to address 0 (register reset value).
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+
+    ack_state = {"active": False, "release_at": 0.0}
+    gpio.write(GPIO_TRI,   0xFFFFFFFF)
+    gpio.write(GPIO2_TRI,  0x00000000)
+    gpio.write(GPIO2_DATA, 1)   # pulse ack to clear any stuck feedback state
+    time.sleep(0.01)
+    gpio.write(GPIO2_DATA, 0)
+
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+    init_vdma(vdma, frame0_addr, frame1_addr)
+    vdma_sr = vdma.read(MM2S_DMASR)
+    print(f"FRAME0=0x{frame0_addr:08x} FRAME1=0x{frame1_addr:08x}")
+    print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")
+    print(format_debug_status(gpio))
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    server.bind(("0.0.0.0", TCP_PORT))
+    server.listen(1)
+    server.settimeout(0.5)
+
+    def _should_stop():
+        return stop_event is not None and stop_event.is_set()
+
+    try:
+        while not _should_stop():
+            try:
+                conn, addr = server.accept()
+            except socket.timeout:
+                service_frame_ready(gpio, vdma, ack_state)
+                continue
+            conn.settimeout(0.5)
+            with conn:
+                while not _should_stop():
+                    packet = recv_exact(conn, CAMERA_PACKET_BYTES,
+                                        lambda: service_frame_ready(gpio, vdma, ack_state))
+                    if packet is None:
+                        service_frame_ready(gpio, vdma, ack_state)
+                        break
+                    write_camera_values(camera_regs, struct.unpack("<12f", packet))
+                    service_frame_ready(gpio, vdma, ack_state)
+    finally:
+        server.close()
+        frame0.freebuffer()
+        frame1.freebuffer()
 
 if __name__ == "__main__":
     main()
