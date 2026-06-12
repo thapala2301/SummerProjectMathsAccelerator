@@ -196,14 +196,17 @@ def main():
     frame0_addr = phys_addr(frame0)
     frame1_addr = phys_addr(frame1)
 
+    # frame_base must be written before camera_commit so the commit latches
+    # the correct addresses, not the reset value (0).
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+
     ack_state = {"active": False, "release_at": 0.0}
     gpio.write(GPIO_TRI, 0xFFFFFFFF)
     gpio.write(GPIO2_TRI, 0x00000000)
     gpio.write(GPIO2_DATA, 0)
 
-    write_camera_values(camera_regs, DEFAULT_CAMERA)
-    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
-    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
     init_vdma(vdma, frame0_addr, frame1_addr)
 
     print(f"FRAME0 phys = 0x{frame0_addr:08x}")
@@ -265,25 +268,29 @@ def run(stop_event=None):
 
     frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
     frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
-    frame0[:] = 0x00FFFFFF  # white — confirms display is working
-    frame1[:] = 0x00FFFFFF
+    frame0[:] = 0
+    frame1[:] = 0
     frame0_addr = phys_addr(frame0)
     frame1_addr = phys_addr(frame1)
 
-    # Write frame bases first — ray marcher starts on bitstream load and will
-    # deadlock if it tries to write to address 0 (register reset value).
+    # Write frame_base before camera_commit so the hardware latches the correct
+    # addresses. Then send ack pulses after commit so the hardware uses those
+    # addresses when it starts the first dispatch.
     camera_regs.write(FRAME_BASE0_REG, frame0_addr)
     camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
 
     ack_state = {"active": False, "release_at": 0.0}
     gpio.write(GPIO_TRI,   0xFFFFFFFF)
     gpio.write(GPIO2_TRI,  0x00000000)
-    gpio.write(GPIO2_DATA, 1)   # pulse ack to clear any stuck feedback state
-    time.sleep(0.01)
-    gpio.write(GPIO2_DATA, 0)
+    for _ in range(4):
+        gpio.write(GPIO2_DATA, 1)
+        time.sleep(0.005)
+        gpio.write(GPIO2_DATA, 0)
+        time.sleep(0.005)
 
-    write_camera_values(camera_regs, DEFAULT_CAMERA)
     init_vdma(vdma, frame0_addr, frame1_addr)
+    time.sleep(3.0)   # VDMA running stable black — monitor completes its lock cycle
     vdma_sr = vdma.read(MM2S_DMASR)
     print(f"FRAME0=0x{frame0_addr:08x} FRAME1=0x{frame1_addr:08x}")
     print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")

@@ -118,12 +118,35 @@ def _init_vdma(frame0, frame1):
     vdma.write(0x50, HEIGHT)
 
 
-def start_ui_vdma():
-    ol     = Overlay("ui.bit")
+def pl_hdmi_load(bitfile, min_dark_sec=5.0):
+    """Kill HDMI, load bitfile, and guarantee at least min_dark_sec of no signal.
+
+    The Overlay() call itself takes ~3-5s, so we overlap the kill timer with the
+    load — only padding with extra sleep if Overlay() finished faster than min_dark_sec.
+    Total dark = max(min_dark_sec, Overlay_time), not their sum.
+    FCLK0 is restored by Overlay() HWH parsing (ui.bit) or manually (SDF).
+    """
+    MMIO(0x43000000, 0x10000).write(0x00, 0x00)  # stop VDMA
+    time.sleep(0.2)                                # let AXI bus go idle
+    Clocks.fclk0_mhz = 15.0                       # clk_wiz loses lock → HDMI drops
+    t0 = time.monotonic()
+    ol = Overlay(bitfile)
+    remaining = min_dark_sec - (time.monotonic() - t0)
+    if remaining > 0:
+        time.sleep(remaining)                      # pad only if Overlay() was faster
+    return ol
+
+
+def start_ui_vdma(ol=None):
+    if ol is None:
+        ol = Overlay("ui.bit")
+    time.sleep(0.1)   # clk_wiz re-lock time after PYNQ restores FCLK0 from HWH
     frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
     frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame0[:] = 0
+    frame1[:] = 0
     _init_vdma(frame0, frame1)
-    return ol, frame0   # frame0 is the live display buffer
+    return ol, frame0
 
 
 if __name__ == "__main__":
@@ -138,12 +161,13 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, _sigint)
 
-    ol, framebuf = start_ui_vdma()
+    ol, framebuf = start_ui_vdma()   # first boot — monitor already cold, no kill needed
 
     while True:
         name, bitfile, music_on = run_selector(framebuf)
-        ol = Overlay(bitfile)
-        Clocks.fclk0_mhz = 50.0   # ui.bit leaves FCLK0 at wrong freq; scaffold expects 50 MHz
+
+        ol = pl_hdmi_load(bitfile)    # kill + load SDF; total dark ≥ 5s
+        Clocks.fclk0_mhz = 50.0
         print(f"Loaded {name}, music: {music_on}")
         stop = threading.Event()
         _in_raymarcher = True
@@ -154,4 +178,5 @@ if __name__ == "__main__":
         finally:
             _in_raymarcher = False
 
-        ol, framebuf = start_ui_vdma()
+        ol = pl_hdmi_load("ui.bit")   # kill + load UI; total dark ≥ 5s
+        ol, framebuf = start_ui_vdma(ol)
