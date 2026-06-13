@@ -253,7 +253,7 @@ proc create_root_design { parentCell } {
   set frame_ready_valid [ create_bd_port -dir I -type data frame_ready_valid ]
   set frame_ready_bank [ create_bd_port -dir I -type data frame_ready_bank ]
   set frame_ack [ create_bd_port -dir O -from 0 -to 0 -type data frame_ack ]
-  set pl_axi_aclk [ create_bd_port -dir I -type clk -freq_hz 100000000 pl_axi_aclk ]
+  set pl_axi_aclk [ create_bd_port -dir I -type clk -freq_hz 125000000 pl_axi_aclk ]
   set pixel_clk_in [ create_bd_port -dir I -type clk -freq_hz 51206400 pixel_clk_in ]
   set btns [ create_bd_port -dir I -from 2 -to 0 btns ]
 
