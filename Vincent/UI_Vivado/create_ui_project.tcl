@@ -17,6 +17,7 @@ set rtl_files [list \
 
 add_files -norecurse $rtl_files
 create_ip -name rgb2dvi -vendor digilentinc.com -library ip -module_name rgb2dvi_0
+set_property -dict [list CONFIG.kGenerateSerialClk {false} CONFIG.kClkPrimitive {MMCM}] [get_ips rgb2dvi_0]
 generate_target all [get_files [get_property IP_FILE [get_ips rgb2dvi_0]]]
 add_files -fileset constrs_1 -norecurse [file normalize "$origin_dir/constraints/pynq_z1_ui.xdc"]
 

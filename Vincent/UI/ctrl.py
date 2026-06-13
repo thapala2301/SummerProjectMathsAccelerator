@@ -196,14 +196,17 @@ def main():
     frame0_addr = phys_addr(frame0)
     frame1_addr = phys_addr(frame1)
 
+    # frame_base must be written before camera_commit so the commit latches
+    # the correct addresses, not the reset value (0).
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+
     ack_state = {"active": False, "release_at": 0.0}
     gpio.write(GPIO_TRI, 0xFFFFFFFF)
     gpio.write(GPIO2_TRI, 0x00000000)
     gpio.write(GPIO2_DATA, 0)
 
-    write_camera_values(camera_regs, DEFAULT_CAMERA)
-    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
-    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
     init_vdma(vdma, frame0_addr, frame1_addr)
 
     print(f"FRAME0 phys = 0x{frame0_addr:08x}")
@@ -257,6 +260,72 @@ def main():
         frame0.freebuffer()
         frame1.freebuffer()
 
+
+def run(stop_event=None):
+    camera_regs = MMIO(CAMERA_REG_BASE, SPAN)
+    vdma        = MMIO(VDMA_BASE, SPAN)
+    gpio        = MMIO(GPIO_BASE, SPAN)
+
+    frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame0[:] = 0
+    frame1[:] = 0
+    frame0_addr = phys_addr(frame0)
+    frame1_addr = phys_addr(frame1)
+
+    # Write frame_base before camera_commit so the hardware latches the correct
+    # addresses. Then send ack pulses after commit so the hardware uses those
+    # addresses when it starts the first dispatch.
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+
+    ack_state = {"active": False, "release_at": 0.0}
+    gpio.write(GPIO_TRI,   0xFFFFFFFF)
+    gpio.write(GPIO2_TRI,  0x00000000)
+    for _ in range(4):
+        gpio.write(GPIO2_DATA, 1)
+        time.sleep(0.005)
+        gpio.write(GPIO2_DATA, 0)
+        time.sleep(0.005)
+
+    init_vdma(vdma, frame0_addr, frame1_addr)
+    vdma_sr = vdma.read(MM2S_DMASR)
+    print(f"FRAME0=0x{frame0_addr:08x} FRAME1=0x{frame1_addr:08x}")
+    print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")
+    print(format_debug_status(gpio))
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    server.bind(("0.0.0.0", TCP_PORT))
+    server.listen(1)
+    server.settimeout(0.5)
+
+    def _should_stop():
+        return stop_event is not None and stop_event.is_set()
+
+    try:
+        while not _should_stop():
+            try:
+                conn, addr = server.accept()
+            except socket.timeout:
+                service_frame_ready(gpio, vdma, ack_state)
+                continue
+            conn.settimeout(0.5)
+            with conn:
+                while not _should_stop():
+                    packet = recv_exact(conn, CAMERA_PACKET_BYTES,
+                                        lambda: service_frame_ready(gpio, vdma, ack_state))
+                    if packet is None:
+                        service_frame_ready(gpio, vdma, ack_state)
+                        break
+                    write_camera_values(camera_regs, struct.unpack("<12f", packet))
+                    service_frame_ready(gpio, vdma, ack_state)
+    finally:
+        server.close()
+        frame0.freebuffer()
+        frame1.freebuffer()
 
 if __name__ == "__main__":
     main()

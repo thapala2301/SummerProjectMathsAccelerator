@@ -20,7 +20,7 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2025.2
+set scripts_vivado_version 2020.2
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
@@ -253,8 +253,9 @@ proc create_root_design { parentCell } {
   set frame_ready_valid [ create_bd_port -dir I -type data frame_ready_valid ]
   set frame_ready_bank [ create_bd_port -dir I -type data frame_ready_bank ]
   set frame_ack [ create_bd_port -dir O -from 0 -to 0 -type data frame_ack ]
-  set pl_axi_aclk [ create_bd_port -dir I -type clk -freq_hz 100000000 pl_axi_aclk ]
+  set pl_axi_aclk [ create_bd_port -dir I -type clk -freq_hz 125000000 pl_axi_aclk ]
   set pixel_clk_in [ create_bd_port -dir I -type clk -freq_hz 51206400 pixel_clk_in ]
+  set btns [ create_bd_port -dir I -from 2 -to 0 btns ]
 
   # Create instance: processing_system7_0, and set properties
   set processing_system7_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7:5.5 processing_system7_0 ]
@@ -262,8 +263,6 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_FPGA_FCLK0_ENABLE {1} \
     CONFIG.PCW_USE_S_AXI_HP0 {1} \
     CONFIG.PCW_USE_S_AXI_HP1 {1} \
-    CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {1} \
-    CONFIG.PCW_GPIO_EMIO_GPIO_WIDTH {3} \
   ] $processing_system7_0
 
 
@@ -272,7 +271,7 @@ proc create_root_design { parentCell } {
 
   # Create instance: smartconnect_0, and set properties
   set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0 ]
-  set_property CONFIG.NUM_MI {3} $smartconnect_0
+  set_property CONFIG.NUM_MI {4} $smartconnect_0
 
 
   # Create instance: axi_vdma_0, and set properties
@@ -295,8 +294,8 @@ proc create_root_design { parentCell } {
     CONFIG.GEN_F0_VSYNC_VSTART {612} \
     CONFIG.GEN_HACTIVE_SIZE {1024} \
     CONFIG.GEN_HFRAME_SIZE {1344} \
-    CONFIG.GEN_HSYNC_END {1204} \
-    CONFIG.GEN_HSYNC_START {1184} \
+    CONFIG.GEN_HSYNC_START   {1104}
+    CONFIG.GEN_HSYNC_END   {1224} \
     CONFIG.GEN_VACTIVE_SIZE {600} \
     CONFIG.HAS_AXI4_LITE {false} \
     CONFIG.VIDEO_MODE {Custom} \
@@ -317,6 +316,13 @@ proc create_root_design { parentCell } {
     CONFIG.C_IS_DUAL {1} \
   ] $axi_gpio_0
 
+
+  # Create instance: axi_gpio_1 (button inputs), and set properties
+  set axi_gpio_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_1 ]
+  set_property -dict [list \
+    CONFIG.C_ALL_INPUTS {1} \
+    CONFIG.C_GPIO_WIDTH {3} \
+  ] $axi_gpio_1
 
   # Create instance: smartconnect_fb, and set properties
   set smartconnect_fb [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_fb ]
@@ -385,12 +391,10 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins axi_camera_regs_ip_0/S00_AXI] [get_bd_intf_pins smartconnect_0/M00_AXI]
   connect_bd_intf_net -intf_net smartconnect_0_M01_AXI [get_bd_intf_pins smartconnect_0/M01_AXI] [get_bd_intf_pins axi_vdma_0/S_AXI_LITE]
   connect_bd_intf_net -intf_net smartconnect_0_M02_AXI [get_bd_intf_pins smartconnect_0/M02_AXI] [get_bd_intf_pins axi_gpio_0/S_AXI]
+  connect_bd_intf_net -intf_net smartconnect_0_M03_AXI [get_bd_intf_pins smartconnect_0/M03_AXI] [get_bd_intf_pins axi_gpio_1/S_AXI]
   connect_bd_intf_net -intf_net smartconnect_fb_M00_AXI [get_bd_intf_pins smartconnect_fb/M00_AXI] [get_bd_intf_pins processing_system7_0/S_AXI_HP0]
   connect_bd_intf_net -intf_net smartconnect_vdma_M00_AXI [get_bd_intf_pins processing_system7_0/S_AXI_HP1] [get_bd_intf_pins smartconnect_vdma/M00_AXI]
   connect_bd_intf_net -intf_net v_tc_0_vtiming_out [get_bd_intf_pins v_tc_0/vtiming_out] [get_bd_intf_pins v_axi4s_vid_out_0/vtiming_in]
-  set GPIO_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 GPIO_0 ]
-  connect_bd_intf_net [get_bd_intf_ports GPIO_0] [get_bd_intf_pins processing_system7_0/GPIO_0]
-
   # Create port connections
   connect_bd_net -net axi_camera_regs_ip_0_cam_origin_flat  [get_bd_pins axi_camera_regs_ip_0/cam_origin_flat] \
   [get_bd_ports cam_origin_flat]
@@ -420,6 +424,7 @@ proc create_root_design { parentCell } {
   [get_bd_pins smartconnect_0/aclk] \
   [get_bd_pins processing_system7_0/M_AXI_GP0_ACLK] \
   [get_bd_pins axi_gpio_0/s_axi_aclk] \
+  [get_bd_pins axi_gpio_1/s_axi_aclk] \
   [get_bd_pins axi_vdma_0/s_axi_lite_aclk] \
   [get_bd_pins smartconnect_fb/aclk] \
   [get_bd_pins processing_system7_0/S_AXI_HP0_ACLK] \
@@ -431,6 +436,7 @@ proc create_root_design { parentCell } {
   [get_bd_pins smartconnect_0/aresetn] \
   [get_bd_pins axi_vdma_0/axi_resetn] \
   [get_bd_pins axi_gpio_0/s_axi_aresetn] \
+  [get_bd_pins axi_gpio_1/s_axi_aresetn] \
   [get_bd_pins smartconnect_fb/aresetn] \
   [get_bd_pins smartconnect_vdma/aresetn]
   connect_bd_net -net v_axi4s_vid_out_0_vid_active_video  [get_bd_pins v_axi4s_vid_out_0/vid_active_video] \
@@ -447,10 +453,13 @@ proc create_root_design { parentCell } {
   [get_bd_pins v_tc_0/gen_clken]
   connect_bd_net -net xlconcat_0_dout  [get_bd_pins xlconcat_0/dout] \
   [get_bd_pins axi_gpio_0/gpio_io_i]
+  connect_bd_net -net btns_1  [get_bd_ports btns] \
+  [get_bd_pins axi_gpio_1/gpio_io_i]
 
   # Create address segments
   assign_bd_address -offset 0x43C00000 -range 0x00010000 -target_address_space [get_bd_addr_spaces processing_system7_0/Data] [get_bd_addr_segs axi_camera_regs_ip_0/S00_AXI/S00_AXI_reg] -force
   assign_bd_address -offset 0x41200000 -range 0x00010000 -target_address_space [get_bd_addr_spaces processing_system7_0/Data] [get_bd_addr_segs axi_gpio_0/S_AXI/Reg] -force
+  assign_bd_address -offset 0x41210000 -range 0x00010000 -target_address_space [get_bd_addr_spaces processing_system7_0/Data] [get_bd_addr_segs axi_gpio_1/S_AXI/Reg] -force
   assign_bd_address -offset 0x43000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces processing_system7_0/Data] [get_bd_addr_segs axi_vdma_0/S_AXI_LITE/Reg] -force
   assign_bd_address -offset 0x00000000 -range 0x20000000 -target_address_space [get_bd_addr_spaces axi_vdma_0/Data_MM2S] [get_bd_addr_segs processing_system7_0/S_AXI_HP1/HP1_DDR_LOWOCM] -force
   assign_bd_address -offset 0x00000000 -range 0x20000000 -target_address_space [get_bd_addr_spaces S_AXI_FB_WR] [get_bd_addr_segs processing_system7_0/S_AXI_HP0/HP0_DDR_LOWOCM] -force
