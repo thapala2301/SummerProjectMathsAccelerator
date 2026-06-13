@@ -28,3 +28,46 @@ Charlie/hdmi_working_ddr_double_buf/vivado/
 Charlie/hdmi_working_ddr_double_buf/myproj/
 Charlie/hdmi_working_ddr_double_buf/.Xil/
 Charlie/hdmi_working_ddr_double_buf/__pycache__/
+
+# ==========================================================
+# Vivado / Xilinx generated outputs (regenerated on build) -
+# applies to every project folder in the repo
+# ==========================================================
+*.cache/
+*.hw/
+*.sim/
+*.runs/
+*.gen/
+*.ip_user_files/
+**/.Xil/
+*.jou
+*.str
+*.wdb
+*.pb
+*.dcp
+*.ltx
+*.backup.jou
+*.backup.log
+
+# Vitis / SDK / build outputs
+.metadata/
+*.elf
+
+# ==========================================================
+# Python / Jupyter
+# ==========================================================
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# ==========================================================
+# OS / editor junk
+# ==========================================================
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+*.swp
+.vscode/
