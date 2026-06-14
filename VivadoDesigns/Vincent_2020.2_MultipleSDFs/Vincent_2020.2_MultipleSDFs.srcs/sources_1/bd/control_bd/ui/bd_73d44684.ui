@@ -1,0 +1,77 @@
+{
+   "ActiveEmotionalView":"Default View",
+   "Default View_ScaleFactor":"0.813926",
+   "Default View_TopLeft":"-509,-360",
+   "ExpandedHierarchyInLayout":"",
+   "guistr":"# # String gsaved with Nlview 7.0r6  2020-01-29 bk=1.5227 VDI=41 GEI=36 GUI=JA:10.0 non-TLS
+#  -string -flagsOSRD
+preplace port DDR -pg 1 -lvl 3 -x 1060 -y 20 -defaultsOSRD
+preplace port FIXED_IO -pg 1 -lvl 3 -x 1060 -y 50 -defaultsOSRD
+preplace port S_AXI_FB_WR -pg 1 -lvl 0 -x -120 -y 20 -defaultsOSRD
+preplace port pl_axi_aresetn -pg 1 -lvl 0 -x -120 -y 230 -defaultsOSRD
+preplace port pixel_aresetn_in -pg 1 -lvl 0 -x -120 -y 140 -defaultsOSRD
+preplace port vid_hsync -pg 1 -lvl 3 -x 1060 -y 290 -defaultsOSRD
+preplace port vid_vsync -pg 1 -lvl 3 -x 1060 -y 320 -defaultsOSRD
+preplace port vid_active -pg 1 -lvl 3 -x 1060 -y 230 -defaultsOSRD
+preplace port frame_ready_valid -pg 1 -lvl 0 -x -120 -y 110 -defaultsOSRD
+preplace port frame_ready_bank -pg 1 -lvl 0 -x -120 -y 80 -defaultsOSRD
+preplace port pl_axi_aclk -pg 1 -lvl 0 -x -120 -y 200 -defaultsOSRD
+preplace port pixel_clk_in -pg 1 -lvl 0 -x -120 -y 170 -defaultsOSRD
+preplace portBus lookat_flat -pg 1 -lvl 3 -x 1060 -y 200 -defaultsOSRD
+preplace portBus cam_origin_flat -pg 1 -lvl 3 -x 1060 -y 80 -defaultsOSRD
+preplace portBus frame_base_0 -pg 1 -lvl 3 -x 1060 -y 140 -defaultsOSRD
+preplace portBus frame_base_1 -pg 1 -lvl 3 -x 1060 -y 170 -defaultsOSRD
+preplace portBus vid_data -pg 1 -lvl 3 -x 1060 -y 260 -defaultsOSRD
+preplace portBus frame_ack -pg 1 -lvl 3 -x 1060 -y 110 -defaultsOSRD
+preplace portBus btns -pg 1 -lvl 0 -x -120 -y 50 -defaultsOSRD
+preplace inst processing_system7_0 -pg 1 -lvl 1 -x 230 -y 150 -defaultsOSRD
+preplace inst axi_camera_regs_ip_0 -pg 1 -lvl 2 -x 750 -y -390 -defaultsOSRD
+preplace inst smartconnect_0 -pg 1 -lvl 1 -x 230 -y 340 -defaultsOSRD
+preplace inst axi_vdma_0 -pg 1 -lvl 1 -x 230 -y -60 -defaultsOSRD
+preplace inst v_tc_0 -pg 1 -lvl 2 -x 750 -y 100 -defaultsOSRD
+preplace inst v_axi4s_vid_out_0 -pg 1 -lvl 2 -x 750 -y -150 -defaultsOSRD
+preplace inst axi_gpio_0 -pg 1 -lvl 1 -x 230 -y -240 -defaultsOSRD
+preplace inst axi_gpio_1 -pg 1 -lvl 2 -x 750 -y 260 -defaultsOSRD
+preplace inst smartconnect_fb -pg 1 -lvl 1 -x 230 -y -390 -defaultsOSRD
+preplace inst value_1 -pg 1 -lvl 1 -x 230 -y 470 -defaultsOSRD
+preplace inst smartconnect_vdma -pg 1 -lvl 2 -x 750 -y -540 -defaultsOSRD
+preplace inst xlconcat_0 -pg 1 -lvl 1 -x 230 -y 580 -defaultsOSRD
+preplace inst axis_subset_converter_0 -pg 1 -lvl 2 -x 750 -y -700 -defaultsOSRD
+preplace netloc axi_camera_regs_ip_0_cam_origin_flat 1 2 1 1040 -400n
+preplace netloc axi_camera_regs_ip_0_lookat_flat 1 2 1 1030 -420n
+preplace netloc axi_camera_regs_ip_0_frame_base_0 1 2 1 1020 -380n
+preplace netloc axi_camera_regs_ip_0_frame_base_1 1 2 1 1000 -360n
+preplace netloc axi_gpio_0_gpio2_io_o 1 1 2 490 390 1010J
+preplace netloc frame_ready_bank_1 1 0 1 -80 80n
+preplace netloc frame_ready_valid_1 1 0 1 -100 110n
+preplace netloc pixel_aresetn_in_1 1 0 2 -90J -550 560
+preplace netloc pixel_clk_in_1 1 0 2 -70 -540 550
+preplace netloc s00_axi_aclk_0_1 1 0 2 -40 -530 570
+preplace netloc s00_axi_aresetn_0_1 1 0 2 -30 -520 540
+preplace netloc v_axi4s_vid_out_0_vid_active_video 1 2 1 970 -240n
+preplace netloc v_axi4s_vid_out_0_vid_data 1 2 1 960 -220n
+preplace netloc v_axi4s_vid_out_0_vid_hsync 1 2 1 950 -200n
+preplace netloc v_axi4s_vid_out_0_vid_vsync 1 2 1 940 -180n
+preplace netloc v_axi4s_vid_out_0_vtg_ce 1 1 2 600 400 930
+preplace netloc value_1_dout 1 1 1 550 100n
+preplace netloc xlconcat_0_dout 1 1 1 440 -250n
+preplace netloc btns_1 1 0 3 -60J -510 520J 380 900
+preplace netloc S_AXI_FB_WR_1 1 0 1 -50 -410n
+preplace netloc axi_vdma_0_M_AXIS_MM2S 1 1 1 480J -720n
+preplace netloc axi_vdma_0_M_AXI_MM2S 1 1 1 500J -560n
+preplace netloc axis_subset_converter_0_M_AXIS 1 1 2 580 340 920
+preplace netloc processing_system7_0_DDR 1 1 2 510 370 980J
+preplace netloc processing_system7_0_FIXED_IO 1 1 2 500 350 990J
+preplace netloc processing_system7_0_M_AXI_GP0 1 0 2 -10 -500 470
+preplace netloc smartconnect_0_M00_AXI 1 1 1 530 -410n
+preplace netloc smartconnect_0_M01_AXI 1 0 2 0 -490 460
+preplace netloc smartconnect_0_M02_AXI 1 0 2 20 -480 450
+preplace netloc smartconnect_0_M03_AXI 1 1 1 470 240n
+preplace netloc smartconnect_fb_M00_AXI 1 0 2 10 -470 440
+preplace netloc smartconnect_vdma_M00_AXI 1 0 3 -20 -620 NJ -620 910
+preplace netloc v_tc_0_vtiming_out 1 1 2 590 360 910
+levelinfo -pg 1 -120 230 750 1060
+pagesize -pg 1 -db -bbox -sgen -290 -780 1240 650
+"
+}
+0

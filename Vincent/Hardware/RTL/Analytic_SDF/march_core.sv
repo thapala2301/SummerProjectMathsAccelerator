@@ -51,9 +51,9 @@ logic s1_is_new_ray;
 logic d1_valid;
 localparam RG_LAT = 48; //48 clk latency in ray gen dir det, ray gen takes longer at 150Mhz
 ray_gen #(
-    .IMG_W(1280),
-    .IMG_H(720),
-    .FOV_Z_CONST(27'h221A000) //720 so like 83.3° angle FOV
+    .IMG_W(512),
+    .IMG_H(600),
+    .FOV_Z_CONST(27'h220DF14) //720 so like 83.3° angle FOV
 ) inst1_ray_gen (
     //inputs
     .clk(clk),

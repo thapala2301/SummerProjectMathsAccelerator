@@ -22,6 +22,10 @@ module axi_fb_writer(
     input logic [7:0] out_iter,
     input logic [26:0] out_dist,
     input logic render_bank,
+    input logic [31:0] frame_base_0,
+    input logic [31:0] frame_base_1,
+    output logic fifo_almost_full,
+    output logic drained,
 
     //outupt axi4 write master AW chan, W chan, B chan DDR3 controller
     //AW Chan - Address Write
@@ -29,8 +33,8 @@ module axi_fb_writer(
     output logic AWVALID, //producer side - march_core
     input logic AWREADY, //consumer side - DDR
     //W Chan
-    output logic [31:0] WDATA,
-    output logic [3:0] WSTRB,
+    output logic [63:0] WDATA,
+    output logic [7:0] WSTRB,
     output logic WVALID, //producer side - march_core
     input logic WREADY, //consumer side - DDR
     //B Chan
@@ -47,13 +51,10 @@ module axi_fb_writer(
 );
 //housekeeping for axi transaction
 localparam AWLEN   = 8'd0;      // single beat
-localparam AWSIZE  = 3'd2;      // 4 bytes
+localparam AWSIZE  = 3'd3;      // 4 bytes
 localparam AWBURST = 2'd1;      
 localparam AWCACHE = 4'b0011;   
 localparam AWPROT  = 3'b000;    
-
-localparam frame_base_0 = 32'h1E00_0000; //frame buffer 0 in DDR
-localparam frame_base_1 = 32'h1E38_4000; //frame buffer 1, offset by res 1270 x 740 x 4 = 3.7 Mb
 wire rst_n = ~rst;
 logic [23:0] rgb_col;
 logic pix_done_d2;
@@ -62,6 +63,7 @@ logic [44:0] send_pixel_data;
 logic fifo_empty, fifo_full;
 logic rd_en;
 //palette inst
+
 palette u_palette(
     .clk(clk), .rst_n(rst_n),
     .iter(out_iter),
