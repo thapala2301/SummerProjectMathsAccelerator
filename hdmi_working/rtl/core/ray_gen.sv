@@ -2,8 +2,8 @@
 `default_nettype none
 
 module ray_gen #(
-    parameter int IMG_W = 1280,
-    parameter int IMG_H = 720,
+    parameter int IMG_W = 512,
+    parameter int IMG_H = 600,
     parameter int PIX_ID_W = 20,
     parameter logic [26:0] FOV_Z_CONST = 27'h1FC0000
 )(
@@ -16,7 +16,8 @@ module ray_gen #(
     input wire valid_in,
 
     input wire [26:0] lookat [0:8],
-    input wire [26:0] cam_origin[0:2],
+    input wire [26:0] cam_origin_left [0:2],
+    input wire [26:0] cam_origin_right[0:2],
 
     output logic [26:0] ray_orig[0:2],
     output logic [26:0] ray_dir [0:2],
@@ -45,8 +46,6 @@ module ray_gen #(
         return {sign, exp, mant};
     endfunction
 
-    localparam int HALF_W = IMG_W / 2;
-    localparam int HALF_H = IMG_H / 2;
     localparam int PIPE_LAT = 48;
     localparam logic [26:0] FOV_Z_CONST_X2 = {
         FOV_Z_CONST[26],
@@ -68,13 +67,26 @@ module ray_gen #(
     logic [PIX_ID_W-1:0] s0_id;
     logic [26:0] s0_lookat [0:8];
     logic [26:0] s0_orig [0:2];
+    logic s0_right_eye;
+    logic [10:0] s0_px_eye;
+
+    assign s0_right_eye = (pix_x >= 11'd256);
+    assign s0_px_eye = s0_right_eye ? (pix_x - 11'd256) : pix_x;
 
     always_ff @(posedge clk) begin
-        s0_px <= pix_x;
+        s0_px <= s0_px_eye;
         s0_py <= pix_y;
         s0_id <= pix_id_in;
         s0_lookat <= lookat;
-        s0_orig <= cam_origin;
+        if (s0_right_eye) begin
+            s0_orig[0] <= cam_origin_right[0];
+            s0_orig[1] <= cam_origin_right[1];
+            s0_orig[2] <= cam_origin_right[2];
+        end else begin
+            s0_orig[0] <= cam_origin_left[0];
+            s0_orig[1] <= cam_origin_left[1];
+            s0_orig[2] <= cam_origin_left[2];
+        end
     end
 
     //s1
@@ -82,8 +94,8 @@ module ray_gen #(
     logic [26:0] s1_dz;
 
     always_ff @(posedge clk) begin
-        s1_dx <= ({ {20{1'b0}}, s0_px, 1'b0 }) - 32'(IMG_W - 1);
-        s1_dy <= 32'(IMG_H - 1) - ({ {21{1'b0}}, s0_py, 1'b0 });
+        s1_dx <= ({ {19{1'b0}}, s0_px, 2'b00 }) - 32'(IMG_W - 2);
+        s1_dy <= 32'(IMG_H - 2) - ({ {20{1'b0}}, s0_py, 2'b00 });
         s1_dz <= FOV_Z_CONST_X2;
     end
 

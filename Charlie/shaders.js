@@ -77,9 +77,9 @@ float ambientOcclusion(vec3 p, vec3 n) {
 
 vec3 background(vec3 rayDir) {
     float t = clamp(rayDir.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 top = vec3(0.62, 0.70, 0.82);
-    vec3 bottom = vec3(0.18, 0.20, 0.24);
-    vec3 col = mix(bottom, top, t);
+    vec3 high = vec3(0.62, 0.70, 0.82);
+    vec3 low = vec3(0.18, 0.20, 0.24);
+    vec3 col = mix(low, high, t);
     float grid = 0.0;
 
     if (abs(rayDir.y) > 0.001) {

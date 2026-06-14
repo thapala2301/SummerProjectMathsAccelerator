@@ -33,17 +33,21 @@ module feedback_ctrl (
     output logic [26:0] out_ray_dir_z,
     output logic [7:0]  out_iteration_count,
     output logic        out_validity,
-
     output logic        stall
 );
 
     logic [189:0] fifo_rd_data;
     logic         fifo_full;
     logic         fifo_empty;
+    logic         fifo_almost_full;
+    logic         fifo_rd_en;
+
+    assign fifo_rd_en = pipeline_ready && !fifo_empty;
 
     FIFO #(
         .WIDTH(190),
-        .DEPTH(128)
+        .DEPTH(512),
+        .ALMOST_FULL_LEVEL(384)
     ) fifo_inst (
         .clk(clk),
         .rst(rst),
@@ -51,13 +55,14 @@ module feedback_ctrl (
         .wr_data({fb_pix_id, fb_pos_x[26:0], fb_pos_y[26:0], fb_pos_z[26:0],
                   fb_ray_dir_x[26:0], fb_ray_dir_y[26:0], fb_ray_dir_z[26:0],
                   fb_iteration_count}),
-        .rd_en(pipeline_ready && !fifo_empty),
+        .rd_en(fifo_rd_en),
         .rd_data(fifo_rd_data),
         .FIFO_FULL(fifo_full),
-        .FIFO_EMPTY(fifo_empty)
+        .FIFO_EMPTY(fifo_empty),
+        .FIFO_ALMOST_FULL(fifo_almost_full)
     );
 
-    assign stall = !fifo_empty || fifo_full;
+    assign stall = !fifo_empty || fifo_almost_full;
 
     always_ff @(posedge clk) begin
         if (rst) begin

@@ -8,8 +8,11 @@ SRCS = \
 	$(ROOT)/rtl/core/sdf_term.v \
 	$(ROOT)/rtl/core/state_pipe.v \
 	$(ROOT)/rtl/core/ray_gen.sv \
+	$(ROOT)/rtl/control/pixel_dispatch.sv \
 	$(ROOT)/rtl/control/feedback_ctrl.sv \
 	$(ROOT)/rtl/control/FIFO.sv \
+	$(ROOT)/rtl/video/ddr_rgb_writer.sv \
+	$(ROOT)/rtl/video/palette.sv \
 	$(ROOT)/rtl/fp/fp_add.v \
 	$(ROOT)/rtl/fp/fp_sub.v \
 	$(ROOT)/rtl/fp/fp_mul.v \
@@ -24,7 +27,8 @@ SRCS = \
 VFLAGS = --cc --exe --build -sv \
 	--top-module sim_top \
 	-Wno-TIMESCALEMOD -Wno-UNOPTFLAT -Wno-WIDTH \
-	-Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-CASEINCOMPLETE
+	-Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-CASEINCOMPLETE \
+	-Wno-CASEX
 
 all: build run
 

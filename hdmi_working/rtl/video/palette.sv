@@ -4,6 +4,7 @@ module palette (
     input  logic        clk,
     input  logic        rst_n,
     input  logic [7:0]  iter,
+    input  logic [23:0] bg_rgb,
     output logic [23:0] rgb
 );
 
@@ -47,7 +48,7 @@ module palette (
             rgb <= 24'd0;
         end else begin
             iter_d1 <= iter;
-            rgb <= palette_rom[iter_d1];
+            rgb <= (iter_d1 >= 8'd128) ? bg_rgb : palette_rom[iter_d1];
         end
     end
 

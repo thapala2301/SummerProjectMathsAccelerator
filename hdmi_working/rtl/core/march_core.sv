@@ -32,16 +32,33 @@ logic [26:0] rg_dir[0:2];
 logic [26:0] rg_orig[0:2];
 logic [19:0] rg_pix_id;
 logic        rg_valid;
+logic [26:0] eye_offset[0:2];
+logic [26:0] cam_origin_left[0:2];
+logic [26:0] cam_origin_right[0:2];
 
 localparam int RG_LAT = 48;
-localparam int SDF_LAT = 55;
+localparam int SDF_LAT = 110;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
+localparam [26:0] HALF_IPD = 27'h1E7AE14;
+
+// lookat[0:2] is the camera right vector; stereo is a parallel sideways offset.
+fp_mul inst_eye_offset_x(.clk(clk), .a(lookat[0]), .b(HALF_IPD), .out(eye_offset[0]));
+fp_mul inst_eye_offset_y(.clk(clk), .a(lookat[1]), .b(HALF_IPD), .out(eye_offset[1]));
+fp_mul inst_eye_offset_z(.clk(clk), .a(lookat[2]), .b(HALF_IPD), .out(eye_offset[2]));
+
+fp_sub inst_left_eye_x(.clk(clk), .a(cam_origin[0]), .b(eye_offset[0]), .out(cam_origin_left[0]));
+fp_sub inst_left_eye_y(.clk(clk), .a(cam_origin[1]), .b(eye_offset[1]), .out(cam_origin_left[1]));
+fp_sub inst_left_eye_z(.clk(clk), .a(cam_origin[2]), .b(eye_offset[2]), .out(cam_origin_left[2]));
+
+fp_add inst_right_eye_x(.clk(clk), .a(cam_origin[0]), .b(eye_offset[0]), .out(cam_origin_right[0]));
+fp_add inst_right_eye_y(.clk(clk), .a(cam_origin[1]), .b(eye_offset[1]), .out(cam_origin_right[1]));
+fp_add inst_right_eye_z(.clk(clk), .a(cam_origin[2]), .b(eye_offset[2]), .out(cam_origin_right[2]));
 
 ray_gen #(
-    .IMG_W(1280),
-    .IMG_H(720),
+    .IMG_W(512),
+    .IMG_H(600),
     .FOV_Z_CONST(27'h220DF14)
 ) inst1_ray_gen(
     .clk(clk),
@@ -51,7 +68,8 @@ ray_gen #(
     .pix_id_in(in_pix_id),
     .valid_in(in_valid),
     .lookat(lookat),
-    .cam_origin(cam_origin),
+    .cam_origin_left(cam_origin_left),
+    .cam_origin_right(cam_origin_right),
     .valid_out(rg_valid),
     .ray_dir(rg_dir),
     .ray_orig(rg_orig),

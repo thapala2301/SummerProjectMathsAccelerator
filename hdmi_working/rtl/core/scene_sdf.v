@@ -6,16 +6,18 @@ module scene_sdf(
     output reg [26:0] sdf_out
 );
 
-wire [26:0] b_fp = {1'b0, 8'd129, 18'h08000};
+wire [26:0] b_fp = {1'b0, 8'd129, 18'h10000};
 wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD};
+wire [26:0] cell_sz = 27'h2090000;
+wire [26:0] half_cell = 27'h2050000;
 
 wire [26:0] rep_px;
 wire [26:0] rep_py;
 wire [26:0] rep_pz;
 
-repeat_cell inst_repeat_x(.clk(clk), .p(px), .q(rep_px));
-repeat_cell inst_repeat_y(.clk(clk), .p(py), .q(rep_py));
-repeat_cell inst_repeat_z(.clk(clk), .p(pz), .q(rep_pz));
+repeat_mod_cell inst_repeat_x(.clk(clk), .p(px), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_px));
+repeat_mod_cell inst_repeat_y(.clk(clk), .p(py), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_py));
+repeat_mod_cell inst_repeat_z(.clk(clk), .p(pz), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_pz));
 
 wire [26:0] abs_px;
 wire [26:0] abs_py;

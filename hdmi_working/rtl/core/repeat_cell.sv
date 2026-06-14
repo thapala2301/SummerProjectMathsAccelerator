@@ -74,19 +74,7 @@ begin
     else if (abs_p < THR_115) repeat_offset = OFF_110;
     else if (abs_p < THR_125) repeat_offset = OFF_120;
     else if (abs_p < THR_135) repeat_offset = OFF_130;
-    else if (abs_p < THR_145) repeat_offset = OFF_140;
-    else if (abs_p < THR_155) repeat_offset = OFF_150;
-    else if (abs_p < THR_165) repeat_offset = OFF_160;
-    else if (abs_p < THR_175) repeat_offset = OFF_170;
-    else if (abs_p < THR_185) repeat_offset = OFF_180;
-    else if (abs_p < THR_195) repeat_offset = OFF_190;
-    else if (abs_p < THR_205) repeat_offset = OFF_200;
-    else if (abs_p < THR_215) repeat_offset = OFF_210;
-    else if (abs_p < THR_225) repeat_offset = OFF_220;
-    else if (abs_p < THR_235) repeat_offset = OFF_230;
-    else if (abs_p < THR_245) repeat_offset = OFF_240;
-    else if (abs_p < THR_255) repeat_offset = OFF_250;
-    else                      repeat_offset = OFF_260;
+    else                      repeat_offset = OFF_140;
 end
 endfunction
 

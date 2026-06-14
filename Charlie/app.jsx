@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { advanceCameraState, clamp, createCameraState, resetCameraState } from "./camera.js";
-import { createGpuRenderer } from "./gpu_renderer.js";
+import { createCpuScaffoldRenderer } from "./cpu_scaffold.js";
 
 const LOOK_SENSITIVITY = 0.0019;
 const HUD_REFRESH_MS = 120;
 const SETTINGS = {
     fovDegrees: 60,
-    renderScale: 1,
+    internalResolution: [512, 300],
 };
 const PREVENT_DEFAULT_KEYS = ["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft", "ShiftRight"];
 
@@ -35,7 +35,7 @@ export default function App() {
         }
 
         try {
-            rendererRef.current = createGpuRenderer(canvasRef.current);
+            rendererRef.current = createCpuScaffoldRenderer(canvasRef.current);
         } catch (error) {
             // Show start-up failures in the overlay
             setGpuError(error instanceof Error ? error.message : "GPU renderer failed");
