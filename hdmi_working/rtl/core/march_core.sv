@@ -14,6 +14,10 @@ module march_core(
     input  logic        in_valid,
     input  logic [26:0] lookat [0:8],
     input  logic [26:0] cam_origin [0:2],
+    input  logic [26:0] scene_cell_sz,
+    input  logic [26:0] scene_half_cell,
+    input  logic [26:0] scene_shape_size,
+    input  logic [26:0] scene_shape_extra,
     output logic        pix_done,
     output logic [19:0] out_pix_id,
     output logic [7:0]  out_iter,
@@ -37,7 +41,9 @@ logic [26:0] cam_origin_left[0:2];
 logic [26:0] cam_origin_right[0:2];
 
 localparam int RG_LAT = 48;
-localparam int SDF_LAT = 101;
+localparam int REPEAT_LAT = 64;
+localparam int SCENE_CORE_LAT = 50; // sphere_sdf = 37, scaffold_sdf = 50, twisted_torus_sdf = 101
+localparam int SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
@@ -92,6 +98,9 @@ logic [26:0] s1_pos_z;
 logic [26:0] s1_dir_x;
 logic [26:0] s1_dir_y;
 logic [26:0] s1_dir_z;
+logic [26:0] s1_scene_pos_x;
+logic [26:0] s1_scene_pos_y;
+logic [26:0] s1_scene_pos_z;
 logic [7:0]  s1_iter;
 logic [19:0] s1_pix_id;
 logic        s1_valid;
@@ -129,13 +138,39 @@ always_ff @(posedge clk) begin
     s1_pix_id <= s1_is_new_ray_comb ? rg_pix_id  : d1_pix_id;
 end
 
+repeat_mod_cell inst_repeat_scene_x(
+    .clk(clk),
+    .p(s1_pos_x),
+    .cell_sz(scene_cell_sz),
+    .half_cell(scene_half_cell),
+    .q(s1_scene_pos_x)
+);
+
+repeat_mod_cell inst_repeat_scene_y(
+    .clk(clk),
+    .p(s1_pos_y),
+    .cell_sz(scene_cell_sz),
+    .half_cell(scene_half_cell),
+    .q(s1_scene_pos_y)
+);
+
+repeat_mod_cell inst_repeat_scene_z(
+    .clk(clk),
+    .p(s1_pos_z),
+    .cell_sz(scene_cell_sz),
+    .half_cell(scene_half_cell),
+    .q(s1_scene_pos_z)
+);
+
 logic [26:0] sdf_dist;
 
-sdf_sphere inst1_scene_sdf(
+scaffold_sdf inst1_scene_sdf(
     .clk(clk),
-    .px(s1_pos_x),
-    .py(s1_pos_y),
-    .pz(s1_pos_z),
+    .px(s1_scene_pos_x),
+    .py(s1_scene_pos_y),
+    .pz(s1_scene_pos_z),
+    .shape_size(scene_shape_size),
+    .shape_extra(scene_shape_extra),
     .sdf_out(sdf_dist)
 );
 
@@ -149,9 +184,9 @@ logic [7:0]  d2_iter;
 logic [19:0] d2_pix_id;
 logic        d2_valid;
 
-state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_x(.clk(clk), .in(s1_pos_x), .out(d2_pos_x));
-state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_y(.clk(clk), .in(s1_pos_y), .out(d2_pos_y));
-state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_pos_z(.clk(clk), .in(s1_pos_z), .out(d2_pos_z));
+state_pipe #(.WIDTH(27), .DEPTH(SCENE_CORE_LAT)) inst1_d2_pos_x(.clk(clk), .in(s1_scene_pos_x), .out(d2_pos_x));
+state_pipe #(.WIDTH(27), .DEPTH(SCENE_CORE_LAT)) inst1_d2_pos_y(.clk(clk), .in(s1_scene_pos_y), .out(d2_pos_y));
+state_pipe #(.WIDTH(27), .DEPTH(SCENE_CORE_LAT)) inst1_d2_pos_z(.clk(clk), .in(s1_scene_pos_z), .out(d2_pos_z));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_x(.clk(clk), .in(s1_dir_x), .out(d2_dir_x));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_y(.clk(clk), .in(s1_dir_y), .out(d2_dir_y));
 state_pipe #(.WIDTH(27), .DEPTH(SDF_LAT)) inst1_d2_dir_z(.clk(clk), .in(s1_dir_z), .out(d2_dir_z));

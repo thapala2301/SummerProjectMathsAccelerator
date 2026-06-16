@@ -40,6 +40,10 @@ localparam [26:0] FP_ZERO = 27'h0;
 localparam [26:0] FP_NEG3 = 27'h6020000;
 localparam [26:0] FP_707  = 27'h1F9A800;
 localparam [26:0] FP_N707 = 27'h5F9A800;
+localparam [26:0] FP_CELL_SZ = 27'h2090000;
+localparam [26:0] FP_HALF_CELL = 27'h2050000;
+localparam [26:0] FP_SHAPE_SIZE = 27'h02050000;
+localparam [26:0] FP_SHAPE_EXTRA = 27'h01F0CCCD;
 
 logic [26:0] lookat[0:8];
 logic [26:0] cam_origin [0:2];
@@ -68,6 +72,10 @@ march_core dut (
     .in_valid(in_valid),
     .lookat(lookat),
     .cam_origin(cam_origin),
+    .scene_cell_sz(FP_CELL_SZ),
+    .scene_half_cell(FP_HALF_CELL),
+    .scene_shape_size(FP_SHAPE_SIZE),
+    .scene_shape_extra(FP_SHAPE_EXTRA),
     .pix_done(pix_done),
     .out_pix_id(out_pix_id),
     .out_iter(out_iter),

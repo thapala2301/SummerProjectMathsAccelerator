@@ -22,6 +22,10 @@ localparam [26:0] FP_ZERO = 27'h0;
 localparam [26:0] FP_NEG_ONE = 27'h5FC0000;
 localparam [26:0] FP_P015 = 27'h1F0CCCD;
 localparam [26:0] FP_P45 = 27'h2048000;
+localparam [26:0] FP_CELL_SZ = 27'h2090000;
+localparam [26:0] FP_HALF_CELL = 27'h2050000;
+localparam [26:0] FP_SHAPE_SIZE = 27'h02050000;
+localparam [26:0] FP_SHAPE_EXTRA = 27'h01F0CCCD;
 
 logic [26:0] lookat[0:8];
 assign lookat[0] = FP_ONE;  assign lookat[1] = FP_ZERO; assign lookat[2] = FP_ZERO;
@@ -155,6 +159,10 @@ march_core inst1_mc(
     .in_valid(fc_valid),
     .lookat(lookat),
     .cam_origin(cam_origin),
+    .scene_cell_sz(FP_CELL_SZ),
+    .scene_half_cell(FP_HALF_CELL),
+    .scene_shape_size(FP_SHAPE_SIZE),
+    .scene_shape_extra(FP_SHAPE_EXTRA),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),
@@ -178,6 +186,8 @@ ddr_rgb_writer #(
     .rst(rst),
     .frame_base_0(32'd0),
     .frame_base_1(32'h0025_8000),
+    .bg_rgb(24'h000000),
+    .shape_rgb(24'hFFFFFF),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),

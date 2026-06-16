@@ -29,24 +29,24 @@ FRAME_BASE0_REG = 12 * 4
 FRAME_BASE1_REG = 13 * 4
 SCENE_CELL_SZ_REG = 14 * 4
 SCENE_HALF_CELL_REG = 15 * 4
-SCENE_FRAME_EXTENT_REG = 16 * 4
-SCENE_FRAME_THICKNESS_REG = 17 * 4
+SCENE_SHAPE_SIZE_REG = 16 * 4
+SCENE_SHAPE_EXTRA_REG = 17 * 4
 SCENE_BG_RGB_REG = 18 * 4
-SCENE_BAR_RGB_REG = 19 * 4
+SCENE_SHAPE_RGB_REG = 19 * 4
 SCENE_BEAT_PULSE_REG = 20 * 4
-SCENE_LOUDNESS_REG = 21 * 4
-SCENE_BRIGHTNESS_REG = 22 * 4
-SCENE_ROUGHNESS_REG = 23 * 4
+SCENE_LEVEL_REG = 21 * 4
+SCENE_SPECTRAL_REG = 22 * 4
+SCENE_NOISE_REG = 23 * 4
 
 SCENE_FLOAT_REGS = (
     SCENE_CELL_SZ_REG,
     SCENE_HALF_CELL_REG,
-    SCENE_FRAME_EXTENT_REG,
-    SCENE_FRAME_THICKNESS_REG,
+    SCENE_SHAPE_SIZE_REG,
+    SCENE_SHAPE_EXTRA_REG,
     SCENE_BEAT_PULSE_REG,
-    SCENE_LOUDNESS_REG,
-    SCENE_BRIGHTNESS_REG,
-    SCENE_ROUGHNESS_REG,
+    SCENE_LEVEL_REG,
+    SCENE_SPECTRAL_REG,
+    SCENE_NOISE_REG,
 )
 
 MM2S_DMACR = 0x00
@@ -77,17 +77,20 @@ DEFAULT_CAMERA = [
     0.0, 0.15, 4.5,
 ]
 
+CAMERA_WRAP_CELL_SZ = 10.0
+CAMERA_WRAP_HALF_CELL = 5.0
+
 DEFAULT_SCENE = (
     10.0,     # cell_sz
     5.0,      # half_cell
-    5.0,      # frame_extent
-    0.15,     # frame_thickness
+    5.0,      # shape_size
+    0.15,     # shape_extra
     0x000000, # bg_rgb
-    0x000000, # bar_rgb
+    0xFFFFFF, # shape_rgb
     0.0,      # beat_pulse
-    0.0,      # loudness
-    0.0,      # brightness
-    0.0,      # roughness
+    0.0,      # level
+    0.0,      # spectral
+    0.0,      # noise
 )
 
 def log(message):
@@ -118,40 +121,47 @@ def fp32_to_fp27(value):
 
     return (sign << 26) | ((exponent & 0xFF) << 18) | fraction18
 
+def wrap_camera_position(value):
+    return ((value + CAMERA_WRAP_HALF_CELL) % CAMERA_WRAP_CELL_SZ) - CAMERA_WRAP_HALF_CELL
+
 def write_camera_values(camera_regs, values):
-    for index, value in enumerate(values):
+    wrapped_values = list(values)
+    for index in range(9, 12):
+        wrapped_values[index] = wrap_camera_position(wrapped_values[index])
+
+    for index, value in enumerate(wrapped_values):
         camera_regs.write(index * 4, fp32_to_fp27(value))
 
 def write_scene_values(camera_regs, values):
     (
         cell_sz,
         half_cell,
-        frame_extent,
-        frame_thickness,
+        shape_size,
+        shape_extra,
         bg_rgb,
-        bar_rgb,
+        shape_rgb,
         beat_pulse,
-        loudness,
-        brightness,
-        roughness,
+        level,
+        spectral,
+        noise,
     ) = values
 
     float_values = (
         cell_sz,
         half_cell,
-        frame_extent,
-        frame_thickness,
+        shape_size,
+        shape_extra,
         beat_pulse,
-        loudness,
-        brightness,
-        roughness,
+        level,
+        spectral,
+        noise,
     )
 
     for offset, value in zip(SCENE_FLOAT_REGS, float_values):
         camera_regs.write(offset, fp32_to_fp27(value))
 
     camera_regs.write(SCENE_BG_RGB_REG, int(bg_rgb) & 0x00FFFFFF)
-    camera_regs.write(SCENE_BAR_RGB_REG, int(bar_rgb) & 0x00FFFFFF)
+    camera_regs.write(SCENE_SHAPE_RGB_REG, int(shape_rgb) & 0x00FFFFFF)
 
 def reset_vdma(vdma):
     vdma.write(MM2S_DMACR, 0)

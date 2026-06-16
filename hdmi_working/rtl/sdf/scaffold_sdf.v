@@ -1,23 +1,19 @@
-module scene_sdf(
-    input        clk,
+// march_core.sv: instantiate scaffold_sdf and set SCENE_CORE_LAT = 50
+// march_core.sv: set SCENE_CELL_SZ = 27'h2090000 and SCENE_HALF_CELL = 27'h2050000
+// ctrl.py: set CAMERA_WRAP_CELL_SZ = 10.0 and CAMERA_WRAP_HALF_CELL = 5.0
+
+module scaffold_sdf(
+    input         clk,
     input  [26:0] px,
     input  [26:0] py,
     input  [26:0] pz,
+    input  [26:0] shape_size,
+    input  [26:0] shape_extra,
     output reg [26:0] sdf_out
 );
 
-wire [26:0] b_fp = {1'b0, 8'd129, 18'h10000};
-wire [26:0] e_fp = {1'b0, 8'd124, 18'h0CCCD};
-wire [26:0] cell_sz = 27'h2090000;
-wire [26:0] half_cell = 27'h2050000;
-
-wire [26:0] rep_px;
-wire [26:0] rep_py;
-wire [26:0] rep_pz;
-
-repeat_mod_cell inst_repeat_x(.clk(clk), .p(px), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_px));
-repeat_mod_cell inst_repeat_y(.clk(clk), .p(py), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_py));
-repeat_mod_cell inst_repeat_z(.clk(clk), .p(pz), .cell_sz(cell_sz), .half_cell(half_cell), .q(rep_pz));
+wire [26:0] b_fp = shape_size;
+wire [26:0] e_fp = shape_extra;
 
 wire [26:0] abs_px;
 wire [26:0] abs_py;
@@ -43,9 +39,9 @@ wire [26:0] term3;
 wire [26:0] temp_min;
 wire [26:0] sdf_comb;
 
-fp_abs inst_abs_px(.in(rep_px), .out(abs_px));
-fp_abs inst_abs_py(.in(rep_py), .out(abs_py));
-fp_abs inst_abs_pz(.in(rep_pz), .out(abs_pz));
+fp_abs inst_abs_px(.in(px), .out(abs_px));
+fp_abs inst_abs_py(.in(py), .out(abs_py));
+fp_abs inst_abs_pz(.in(pz), .out(abs_pz));
 
 fp_sub sub_px_b(.clk(clk), .a(abs_px), .b(b_fp), .out(px_intermed));
 fp_sub sub_py_b(.clk(clk), .a(abs_py), .b(b_fp), .out(py_intermed));
@@ -86,5 +82,41 @@ fp_min inst2_min(.a(temp_min_reg), .b(term3_reg), .out(sdf_comb));
 always @(posedge clk) begin
     sdf_out <= sdf_comb;
 end
+
+endmodule
+
+// length(max((v0, v1, v2), 0.0)) + min(max(v0, max(v1, v2)), 0.0)
+module sdf_term(
+    input clk,
+    input wire [26:0] vx,
+    input wire [26:0] vy,
+    input wire [26:0] vz,
+    output wire [26:0] out
+);
+
+    wire [26:0] cx = vx[26] ? 27'b0 : vx;
+    wire [26:0] cy = vy[26] ? 27'b0 : vy;
+    wire [26:0] cz = vz[26] ? 27'b0 : vz;
+
+    wire [26:0] len;
+    fp_length inst_len(.clk(clk), .x(cx), .y(cy), .z(cz), .out(len));
+
+    wire [26:0] temp_max;
+    fp_max inst1_max(.a(vy), .b(vz), .out(temp_max));
+
+    reg [26:0] temp_max_reg;
+    reg [26:0] vx_reg;
+    always @(posedge clk) begin
+        temp_max_reg <= temp_max;
+        vx_reg <= vx;
+    end
+
+    wire [26:0] temp_maxv0_maxv1_v2;
+    fp_max inst2_max(.a(vx_reg), .b(temp_max_reg), .out(temp_maxv0_maxv1_v2));
+    wire [26:0] clamped_neg = temp_maxv0_maxv1_v2[26] ? temp_maxv0_maxv1_v2 : 27'b0;
+
+    wire [26:0] clamped_neg_delayed;
+    state_pipe #(.WIDTH(27), .DEPTH(31)) pipe_clamped_neg(.clk(clk), .in(clamped_neg), .out(clamped_neg_delayed));
+    fp_add final_add(.clk(clk), .a(len), .b(clamped_neg_delayed), .out(out));
 
 endmodule

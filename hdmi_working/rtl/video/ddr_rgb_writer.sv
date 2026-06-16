@@ -8,6 +8,7 @@ module ddr_rgb_writer #(
     input  logic [31:0] frame_base_0,
     input  logic [31:0] frame_base_1,
     input  logic [23:0] bg_rgb,
+    input  logic [23:0] shape_rgb,
     input  logic        pix_done,
     input  logic [19:0] out_pix_id,
     input  logic [7:0]  out_iter,
@@ -105,6 +106,7 @@ module ddr_rgb_writer #(
         .rst_n(rst_n),
         .iter(out_iter),
         .bg_rgb(bg_rgb),
+        .shape_rgb(shape_rgb),
         .rgb(rgb_col)
     );
 

@@ -244,14 +244,14 @@
             slv_reg13 <= 32'h00000000;
             slv_reg14 <= 32'h02090000; // cell_sz
             slv_reg15 <= 32'h02050000; // half_cell
-            slv_reg16 <= 32'h02050000; // frame_extent
-            slv_reg17 <= 32'h01F0CCCD; // frame_thickness
+            slv_reg16 <= 32'h02050000; // shape_size
+            slv_reg17 <= 32'h01F0CCCD; // shape_extra
             slv_reg18 <= 32'h00000000; // bg_rgb
-            slv_reg19 <= 32'h00000000; // bar_rgb
+            slv_reg19 <= 32'h00FFFFFF; // shape_rgb
             slv_reg20 <= 32'h00000000; // beat_pulse
-            slv_reg21 <= 32'h00000000; // loudness
-            slv_reg22 <= 32'h00000000; // brightness
-            slv_reg23 <= 32'h00000000; // roughness
+            slv_reg21 <= 32'h00000000; // level
+            slv_reg22 <= 32'h00000000; // spectral
+            slv_reg23 <= 32'h00000000; // noise
 	    end 
 	  else begin
 	    if (S_AXI_WVALID)

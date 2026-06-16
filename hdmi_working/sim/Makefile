@@ -4,8 +4,8 @@ SRCS = \
 	sim_top.sv \
 	$(ROOT)/rtl/core/march_core.sv \
 	$(ROOT)/rtl/core/repeat_cell.sv \
-	$(ROOT)/rtl/core/scene_sdf.v \
-	$(ROOT)/rtl/core/sdf_term.v \
+	$(ROOT)/rtl/sdf/scaffold_sdf.v \
+	$(ROOT)/rtl/sdf/twisted_torus_sdf.v \
 	$(ROOT)/rtl/core/state_pipe.v \
 	$(ROOT)/rtl/core/ray_gen.sv \
 	$(ROOT)/rtl/control/pixel_dispatch.sv \
@@ -85,8 +85,8 @@ test-sdf:
 		scene_sdf_test_top.sv \
 		tb_scene_sdf_main.cpp \
 		$(ROOT)/rtl/core/repeat_cell.sv \
-		$(ROOT)/rtl/core/scene_sdf.v \
-		$(ROOT)/rtl/core/sdf_term.v \
+		$(ROOT)/rtl/sdf/scaffold_sdf.v \
+		$(ROOT)/rtl/sdf/twisted_torus_sdf.v \
 		$(ROOT)/rtl/core/state_pipe.v \
 		$(ROOT)/rtl/fp/fp_add.v \
 		$(ROOT)/rtl/fp/fp_sub.v \
@@ -128,8 +128,7 @@ test-march:
 		$(ROOT)/rtl/core/march_core.sv \
 		$(ROOT)/rtl/core/repeat_cell.sv \
 		$(ROOT)/rtl/core/ray_gen.sv \
-		$(ROOT)/rtl/core/scene_sdf.v \
-		$(ROOT)/rtl/core/sdf_term.v \
+		$(ROOT)/rtl/sdf/scaffold_sdf.v \
 		$(ROOT)/rtl/core/state_pipe.v \
 		$(ROOT)/rtl/fp/fp_add.v \
 		$(ROOT)/rtl/fp/fp_sub.v \

@@ -28,9 +28,9 @@ set rtl_files [list \
     [file normalize "$origin_dir/rtl/fp/int2fp.v"] \
     [file normalize "$origin_dir/rtl/core/repeat_cell.sv"] \
     [file normalize "$origin_dir/rtl/core/repeat_mod_cell.sv"] \
-    [file normalize "$origin_dir/rtl/core/scene_sdf.v"] \
     [file normalize "$origin_dir/rtl/sdf/sphere_sdf.v"] \
-    [file normalize "$origin_dir/rtl/core/sdf_term.v"] \
+    [file normalize "$origin_dir/rtl/sdf/scaffold_sdf.v"] \
+    [file normalize "$origin_dir/rtl/sdf/twisted_torus_sdf.v"] \
     [file normalize "$origin_dir/rtl/core/state_pipe.v"] \
     [file normalize "$origin_dir/rtl/control/FIFO.sv"] \
     [file normalize "$origin_dir/rtl/control/feedback_ctrl.sv"] \

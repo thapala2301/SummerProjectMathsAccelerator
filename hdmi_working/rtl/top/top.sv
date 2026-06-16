@@ -54,24 +54,24 @@ logic [26:0] lookat_frame[0:8];
 logic [26:0] cam_origin_frame[0:2];
 logic [26:0] scene_cell_sz;
 logic [26:0] scene_half_cell;
-logic [26:0] scene_frame_extent;
-logic [26:0] scene_frame_thickness;
+logic [26:0] scene_shape_size;
+logic [26:0] scene_shape_extra;
 logic [23:0] scene_bg_rgb;
-logic [23:0] scene_bar_rgb;
+logic [23:0] scene_shape_rgb;
 logic [26:0] scene_beat_pulse;
-logic [26:0] scene_loudness;
-logic [26:0] scene_brightness;
-logic [26:0] scene_roughness;
+logic [26:0] scene_level;
+logic [26:0] scene_spectral;
+logic [26:0] scene_noise;
 logic [26:0] scene_cell_sz_frame;
 logic [26:0] scene_half_cell_frame;
-logic [26:0] scene_frame_extent_frame;
-logic [26:0] scene_frame_thickness_frame;
+logic [26:0] scene_shape_size_frame;
+logic [26:0] scene_shape_extra_frame;
 logic [23:0] scene_bg_rgb_frame;
-logic [23:0] scene_bar_rgb_frame;
+logic [23:0] scene_shape_rgb_frame;
 logic [26:0] scene_beat_pulse_frame;
-logic [26:0] scene_loudness_frame;
-logic [26:0] scene_brightness_frame;
-logic [26:0] scene_roughness_frame;
+logic [26:0] scene_level_frame;
+logic [26:0] scene_spectral_frame;
+logic [26:0] scene_noise_frame;
 genvar g;
 generate
     for (g = 0; g < 9; g++) begin : gen_lookat_unpack
@@ -84,14 +84,14 @@ endgenerate
 
 assign scene_cell_sz = scene_ctrl_flat[26:0];
 assign scene_half_cell = scene_ctrl_flat[58:32];
-assign scene_frame_extent = scene_ctrl_flat[90:64];
-assign scene_frame_thickness = scene_ctrl_flat[122:96];
+assign scene_shape_size = scene_ctrl_flat[90:64];
+assign scene_shape_extra = scene_ctrl_flat[122:96];
 assign scene_bg_rgb = scene_ctrl_flat[151:128];
-assign scene_bar_rgb = scene_ctrl_flat[183:160];
+assign scene_shape_rgb = scene_ctrl_flat[183:160];
 assign scene_beat_pulse = scene_ctrl_flat[218:192];
-assign scene_loudness = scene_ctrl_flat[250:224];
-assign scene_brightness = scene_ctrl_flat[282:256];
-assign scene_roughness = scene_ctrl_flat[314:288];
+assign scene_level = scene_ctrl_flat[250:224];
+assign scene_spectral = scene_ctrl_flat[282:256];
+assign scene_noise = scene_ctrl_flat[314:288];
 
 logic [10:0] pd_x;
 logic [9:0]  pd_y;
@@ -172,14 +172,14 @@ always_ff @(posedge sys_clk) begin
         frame_ready_bank <= 1'b0;
         scene_cell_sz_frame <= '0;
         scene_half_cell_frame <= '0;
-        scene_frame_extent_frame <= '0;
-        scene_frame_thickness_frame <= '0;
+        scene_shape_size_frame <= '0;
+        scene_shape_extra_frame <= '0;
         scene_bg_rgb_frame <= '0;
-        scene_bar_rgb_frame <= '0;
+        scene_shape_rgb_frame <= '0;
         scene_beat_pulse_frame <= '0;
-        scene_loudness_frame <= '0;
-        scene_brightness_frame <= '0;
-        scene_roughness_frame <= '0;
+        scene_level_frame <= '0;
+        scene_spectral_frame <= '0;
+        scene_noise_frame <= '0;
         for (cam_i = 0; cam_i < 9; cam_i = cam_i + 1) begin
             lookat_frame[cam_i] <= '0;
         end
@@ -197,14 +197,14 @@ always_ff @(posedge sys_clk) begin
         frame_ready_bank <= 1'b0;
         scene_cell_sz_frame <= '0;
         scene_half_cell_frame <= '0;
-        scene_frame_extent_frame <= '0;
-        scene_frame_thickness_frame <= '0;
+        scene_shape_size_frame <= '0;
+        scene_shape_extra_frame <= '0;
         scene_bg_rgb_frame <= '0;
-        scene_bar_rgb_frame <= '0;
+        scene_shape_rgb_frame <= '0;
         scene_beat_pulse_frame <= '0;
-        scene_loudness_frame <= '0;
-        scene_brightness_frame <= '0;
-        scene_roughness_frame <= '0;
+        scene_level_frame <= '0;
+        scene_spectral_frame <= '0;
+        scene_noise_frame <= '0;
     end else begin
         frame_ack_d <= frame_ack;
 
@@ -218,14 +218,14 @@ always_ff @(posedge sys_clk) begin
             end
             scene_cell_sz_frame <= scene_cell_sz;
             scene_half_cell_frame <= scene_half_cell;
-            scene_frame_extent_frame <= scene_frame_extent;
-            scene_frame_thickness_frame <= scene_frame_thickness;
+            scene_shape_size_frame <= scene_shape_size;
+            scene_shape_extra_frame <= scene_shape_extra;
             scene_bg_rgb_frame <= scene_bg_rgb;
-            scene_bar_rgb_frame <= scene_bar_rgb;
+            scene_shape_rgb_frame <= scene_shape_rgb;
             scene_beat_pulse_frame <= scene_beat_pulse;
-            scene_loudness_frame <= scene_loudness;
-            scene_brightness_frame <= scene_brightness;
-            scene_roughness_frame <= scene_roughness;
+            scene_level_frame <= scene_level;
+            scene_spectral_frame <= scene_spectral;
+            scene_noise_frame <= scene_noise;
             dispatch_enable <= 1'b1;
         end
 
@@ -264,14 +264,14 @@ always_ff @(posedge sys_clk) begin
             end
             scene_cell_sz_frame <= scene_cell_sz;
             scene_half_cell_frame <= scene_half_cell;
-            scene_frame_extent_frame <= scene_frame_extent;
-            scene_frame_thickness_frame <= scene_frame_thickness;
+            scene_shape_size_frame <= scene_shape_size;
+            scene_shape_extra_frame <= scene_shape_extra;
             scene_bg_rgb_frame <= scene_bg_rgb;
-            scene_bar_rgb_frame <= scene_bar_rgb;
+            scene_shape_rgb_frame <= scene_shape_rgb;
             scene_beat_pulse_frame <= scene_beat_pulse;
-            scene_loudness_frame <= scene_loudness;
-            scene_brightness_frame <= scene_brightness;
-            scene_roughness_frame <= scene_roughness;
+            scene_level_frame <= scene_level;
+            scene_spectral_frame <= scene_spectral;
+            scene_noise_frame <= scene_noise;
             dispatch_enable <= 1'b1;
         end
     end
@@ -334,6 +334,10 @@ march_core inst1_mc(
     .in_valid(fc_valid),
     .lookat(lookat_frame),
     .cam_origin(cam_origin_frame),
+    .scene_cell_sz(scene_cell_sz_frame),
+    .scene_half_cell(scene_half_cell_frame),
+    .scene_shape_size(scene_shape_size_frame),
+    .scene_shape_extra(scene_shape_extra_frame),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),
@@ -356,6 +360,7 @@ ddr_rgb_writer #(
     .frame_base_0(frame_base_0),
     .frame_base_1(frame_base_1),
     .bg_rgb(scene_bg_rgb_frame),
+    .shape_rgb(scene_shape_rgb_frame),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),

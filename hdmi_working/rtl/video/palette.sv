@@ -5,12 +5,26 @@ module palette (
     input  logic        rst_n,
     input  logic [7:0]  iter,
     input  logic [23:0] bg_rgb,
+    input  logic [23:0] shape_rgb,
     output logic [23:0] rgb
 );
 
     logic [7:0] iter_d1;
     logic [23:0] palette_rom [0:255];
+    logic [23:0] tinted_rgb;
     integer idx;
+
+    function automatic [23:0] tint_rgb(input [23:0] base_rgb, input [23:0] tint);
+        reg [15:0] red_mul;
+        reg [15:0] green_mul;
+        reg [15:0] blue_mul;
+        begin
+            red_mul = base_rgb[23:16] * tint[23:16];
+            green_mul = base_rgb[15:8] * tint[15:8];
+            blue_mul = base_rgb[7:0] * tint[7:0];
+            tint_rgb = {red_mul[15:8], green_mul[15:8], blue_mul[15:8]};
+        end
+    endfunction
 
     function automatic [23:0] palette_value(input integer step);
         integer rem_r;
@@ -45,10 +59,12 @@ module palette (
     always_ff @(posedge clk) begin
         if (!rst_n) begin
             iter_d1 <= 8'd0;
+            tinted_rgb <= 24'd0;
             rgb <= 24'd0;
         end else begin
             iter_d1 <= iter;
-            rgb <= (iter_d1 >= 8'd128) ? bg_rgb : palette_rom[iter_d1];
+            tinted_rgb <= tint_rgb(palette_rom[iter], shape_rgb);
+            rgb <= (iter_d1 >= 8'd128) ? bg_rgb : tinted_rgb;
         end
     end
 
