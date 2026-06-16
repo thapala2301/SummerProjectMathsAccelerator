@@ -37,7 +37,7 @@ logic [26:0] cam_origin_left[0:2];
 logic [26:0] cam_origin_right[0:2];
 
 localparam int RG_LAT = 48;
-localparam int SDF_LAT = 110;
+localparam int SDF_LAT = 101;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
 localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
@@ -131,7 +131,7 @@ end
 
 logic [26:0] sdf_dist;
 
-scene_sdf inst1_scene_sdf(
+sdf_sphere inst1_scene_sdf(
     .clk(clk),
     .px(s1_pos_x),
     .py(s1_pos_y),

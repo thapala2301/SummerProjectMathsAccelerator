@@ -29,6 +29,7 @@ set rtl_files [list \
     [file normalize "$origin_dir/rtl/core/repeat_cell.sv"] \
     [file normalize "$origin_dir/rtl/core/repeat_mod_cell.sv"] \
     [file normalize "$origin_dir/rtl/core/scene_sdf.v"] \
+    [file normalize "$origin_dir/rtl/sdf/sphere_sdf.v"] \
     [file normalize "$origin_dir/rtl/core/sdf_term.v"] \
     [file normalize "$origin_dir/rtl/core/state_pipe.v"] \
     [file normalize "$origin_dir/rtl/control/FIFO.sv"] \
@@ -60,7 +61,7 @@ set_property -dict [list \
     CONFIG.CLKOUT1_USED {true} \
     CONFIG.CLKOUT2_USED {true} \
     CONFIG.CLKOUT3_USED {true} \
-    CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {125.000} \
+    CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {140.000} \
     CONFIG.CLKOUT2_REQUESTED_OUT_FREQ {51.2064} \
     CONFIG.CLKOUT3_REQUESTED_OUT_FREQ {256.032} \
     CONFIG.USE_LOCKED {true} \

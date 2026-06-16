@@ -67,6 +67,8 @@ GPIO2_TRI = 0x0C
 DMACR_RUN_PARK = 0x00000001
 DMACR_RESET = 0x00000004
 FRAME_ACK_PULSE_S = 0.001
+FRAME_STATS_REPORT_S = 1.0
+PRINT_LOCK = threading.Lock()
 
 DEFAULT_CAMERA = [
     1.0, 0.0, 0.0,
@@ -87,6 +89,10 @@ DEFAULT_SCENE = (
     0.0,      # brightness
     0.0,      # roughness
 )
+
+def log(message):
+    with PRINT_LOCK:
+        print(message, flush=True)
 
 def phys_addr(buffer):
     if hasattr(buffer, "physical_address"):
@@ -176,7 +182,7 @@ def init_vdma(vdma, frame0_addr, frame1_addr):
     vdma.write(MM2S_DMACR, DMACR_RUN_PARK)
     vdma.write(MM2S_VSIZE, HEIGHT)
 
-def service_frame_ready(gpio, vdma, ack_state):
+def service_frame_ready(gpio, vdma, ack_state, frame_stats):
     now = time.monotonic()
     status = gpio.read(GPIO_DATA)
     ready_bank = status & 1
@@ -189,6 +195,15 @@ def service_frame_ready(gpio, vdma, ack_state):
         return
 
     if ready_valid:
+        frame_stats["count"] += 1
+        report_dt = now - frame_stats["report_at"]
+        if report_dt >= FRAME_STATS_REPORT_S:
+            fps = frame_stats["count"] / report_dt
+            frame_ms = 1000.0 / fps
+            log(f"{fps:.2f} fps {frame_ms:.2f} ms")
+            frame_stats["count"] = 0
+            frame_stats["report_at"] = now
+
         set_display_bank(vdma, ready_bank)
         gpio.write(GPIO2_DATA, 1)
         ack_state["active"] = True
@@ -219,17 +234,17 @@ def open_server(port, timeout=None):
 
 def serve_audio(camera_regs):
     server = open_server(AUDIO_TCP_PORT)
-    print(f"waiting for audio controller on TCP port {AUDIO_TCP_PORT}")
+    log(f"waiting for audio controller on TCP port {AUDIO_TCP_PORT}")
 
     while True:
         conn, addr = server.accept()
-        print("audio connected at:", addr)
+        log(f"audio connected at: {addr}")
 
         with conn:
             while True:
                 packet = recv_exact(conn, SCENE_PACKET_BYTES)
                 if packet is None:
-                    print("audio controller disconnected")
+                    log("audio controller disconnected")
                     break
 
                 write_scene_values(
@@ -250,6 +265,7 @@ def main():
     frame1_addr = phys_addr(frame1)
 
     ack_state = {"active": False, "release_at": 0.0}
+    frame_stats = {"count": 0, "report_at": time.monotonic()}
     gpio.write(GPIO_TRI, 0xFFFFFFFF)
     gpio.write(GPIO2_TRI, 0x00000000)
     gpio.write(GPIO2_DATA, 0)
@@ -268,17 +284,17 @@ def main():
     audio_thread.start()
 
     server = open_server(CAMERA_TCP_PORT, timeout=0.5)
-    print(f"waiting for camera controller on TCP port {CAMERA_TCP_PORT}")
+    log(f"waiting for camera controller on TCP port {CAMERA_TCP_PORT}")
 
     try:
         while True:
             try:
                 conn, addr = server.accept()
             except socket.timeout:
-                service_frame_ready(gpio, vdma, ack_state)
+                service_frame_ready(gpio, vdma, ack_state, frame_stats)
                 continue
 
-            print("controls connected at:", addr)
+            log(f"controls connected at: {addr}")
             conn.settimeout(0.5)
 
             with conn:
@@ -286,18 +302,18 @@ def main():
                     packet = recv_exact(
                         conn,
                         CAMERA_PACKET_BYTES,
-                        lambda: service_frame_ready(gpio, vdma, ack_state),
+                        lambda: service_frame_ready(gpio, vdma, ack_state, frame_stats),
                     )
                     if packet is None:
-                        service_frame_ready(gpio, vdma, ack_state)
-                        print("camera controller disconnected")
+                        service_frame_ready(gpio, vdma, ack_state, frame_stats)
+                        log("camera controller disconnected")
                         break
 
                     write_camera_values(
                         camera_regs,
                         struct.unpack(CAMERA_PACKET_FORMAT, packet),
                     )
-                    service_frame_ready(gpio, vdma, ack_state)
+                    service_frame_ready(gpio, vdma, ack_state, frame_stats)
     finally:
         server.close()
         frame0.freebuffer()

@@ -56,62 +56,79 @@ localparam [26:0] OFF_220 = 27'h21AE000;
 localparam [26:0] OFF_230 = 27'h21B3000;
 localparam [26:0] OFF_240 = 27'h21B8000;
 localparam [26:0] OFF_250 = 27'h21BD000;
-localparam [26:0] OFF_260 = 27'h21C1000;
+
+localparam [26:0] FAR_COORD        = 27'h2164000;
+localparam int    NUM_REPEAT_BANDS = 26;
+
+localparam logic [26:0] THRESHOLDS [0:NUM_REPEAT_BANDS-1] = '{
+    THR_5,   THR_15,  THR_25,  THR_35,  THR_45,  THR_55,  THR_65,
+    THR_75,  THR_85,  THR_95,  THR_105, THR_115, THR_125, THR_135,
+    THR_145, THR_155, THR_165, THR_175, THR_185, THR_195, THR_205,
+    THR_215, THR_225, THR_235, THR_245, THR_255
+};
+
+localparam logic [26:0] OFFSETS [0:NUM_REPEAT_BANDS-1] = '{
+    27'h0,   OFF_10,  OFF_20,  OFF_30,  OFF_40,  OFF_50,  OFF_60,
+    OFF_70,  OFF_80,  OFF_90,  OFF_100, OFF_110, OFF_120, OFF_130,
+    OFF_140, OFF_150, OFF_160, OFF_170, OFF_180, OFF_190, OFF_200,
+    OFF_210, OFF_220, OFF_230, OFF_240, OFF_250
+};
 
 function automatic [26:0] repeat_offset(input [26:0] abs_p);
-begin
-    if (abs_p < THR_5)        repeat_offset = 27'h0;
-    else if (abs_p < THR_15)  repeat_offset = OFF_10;
-    else if (abs_p < THR_25)  repeat_offset = OFF_20;
-    else if (abs_p < THR_35)  repeat_offset = OFF_30;
-    else if (abs_p < THR_45)  repeat_offset = OFF_40;
-    else if (abs_p < THR_55)  repeat_offset = OFF_50;
-    else if (abs_p < THR_65)  repeat_offset = OFF_60;
-    else if (abs_p < THR_75)  repeat_offset = OFF_70;
-    else if (abs_p < THR_85)  repeat_offset = OFF_80;
-    else if (abs_p < THR_95)  repeat_offset = OFF_90;
-    else if (abs_p < THR_105) repeat_offset = OFF_100;
-    else if (abs_p < THR_115) repeat_offset = OFF_110;
-    else if (abs_p < THR_125) repeat_offset = OFF_120;
-    else if (abs_p < THR_135) repeat_offset = OFF_130;
-    else                      repeat_offset = OFF_140;
-end
+    logic matched;
+    begin
+        repeat_offset = OFFSETS[NUM_REPEAT_BANDS-1];
+        matched = 1'b0;
+
+        for (int idx = 0; idx < NUM_REPEAT_BANDS - 1; idx++) begin
+            if (!matched && (abs_p < THRESHOLDS[idx])) begin
+                repeat_offset = OFFSETS[idx];
+                matched = 1'b1;
+            end
+        end
+    end
 endfunction
 
 wire [26:0] abs_p;
-wire [26:0] wrap_off_comb;
-reg  [26:0] wrap_off;
-reg  [26:0] p_r;
-wire [26:0] p_minus_wrap;
-wire [26:0] p_plus_wrap;
-wire [26:0] p_d4;
-wire        p_neg_d4;
-wire        p_wrap_d4;
+wire [26:0] wrap_offset_next;
+wire        in_range_next;
+reg  [26:0] wrap_offset_latched;
+reg  [26:0] p_latched;
+wire [26:0] p_minus_offset;
+wire [26:0] p_plus_offset;
+wire [26:0] p_delayed;
+wire        p_neg_delayed;
+wire        wrap_active_delayed;
+wire        in_range_delayed;
 
 fp_abs inst_abs_p(.in(p), .out(abs_p));
-assign wrap_off_comb = repeat_offset(abs_p);
+assign wrap_offset_next = repeat_offset(abs_p);
+assign in_range_next = (abs_p < THRESHOLDS[NUM_REPEAT_BANDS - 1]);
 
-//register wrappoff and p to break fp_abs and repeatoffset combinatorial path
+// Register the selected wrap offset so the compare path is separated from the add/sub path
 always @(posedge clk) begin
-    wrap_off <= wrap_off_comb;
-    p_r      <= p;
+    wrap_offset_latched <= wrap_offset_next;
+    p_latched <= p;
 end
 
-fp_sub inst_sub_wrap(.clk(clk), .a(p_r), .b(wrap_off), .out(p_minus_wrap));
-fp_add inst_add_wrap(.clk(clk), .a(p_r), .b(wrap_off), .out(p_plus_wrap));
+fp_sub inst_sub_wrap(.clk(clk), .a(p_latched), .b(wrap_offset_latched), .out(p_minus_offset));
+fp_add inst_add_wrap(.clk(clk), .a(p_latched), .b(wrap_offset_latched), .out(p_plus_offset));
 
-// Delays increase by 1 to match the extra input register cycle
-state_pipe #(.WIDTH(27), .DEPTH(5)) pipe_p_d4    (.clk(clk), .in(p),               .out(p_d4));
-state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_sign_d4 (.clk(clk), .in(p[26]),           .out(p_neg_d4));
-state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_wrap_d4 (.clk(clk), .in(|wrap_off_comb),  .out(p_wrap_d4));
+// Delay the pass-through path by the same 5 cycles as the wrapped path.
+state_pipe #(.WIDTH(27), .DEPTH(5)) pipe_p_delayed           (.clk(clk), .in(p),                 .out(p_delayed));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_sign_delayed        (.clk(clk), .in(p[26]),             .out(p_neg_delayed));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_wrap_active_delayed (.clk(clk), .in(|wrap_offset_next), .out(wrap_active_delayed));
+state_pipe #(.WIDTH(1),  .DEPTH(5)) pipe_range_delayed       (.clk(clk), .in(in_range_next),     .out(in_range_delayed));
 
 always_comb begin
-    if (!p_wrap_d4)
-        q = p_d4;
-    else if (p_neg_d4)
-        q = p_plus_wrap;
+    if (!in_range_delayed)
+        q = FAR_COORD;
+    else if (!wrap_active_delayed)
+        q = p_delayed;
+    else if (p_neg_delayed)
+        q = p_plus_offset;
     else
-        q = p_minus_wrap;
+        q = p_minus_offset;
 end
 
 endmodule
