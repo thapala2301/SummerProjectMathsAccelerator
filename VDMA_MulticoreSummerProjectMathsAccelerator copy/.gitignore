@@ -1,0 +1,73 @@
+react_interactive/node_modules/
+react_interactive/dist/
+
+cpu_reference/*.exe
+cpu_reference/benchmark.csv
+cpu_reference/out.ppm
+cpu_reference/out.png
+
+Cornell_Work
+
+# Verilator build artifacts
+Vincent/Hardware/obj_dir/
+Vincent/Hardware/frame.ppm
+Vincent/Hardware/neural_frame.ppm
+*.ppm
+
+# Generated Vivado project outputs for Charlie camera snapshots.
+Charlie/hdmi_working_camera_bram/v/
+Charlie/hdmi_working_camera_bram/vivado/
+Charlie/hdmi_working_camera_ddr/v/
+Charlie/hdmi_working_camera_ddr/vivado/
+Charlie/hdmi_working_camera_bram/.Xil/
+Charlie/hdmi_working_camera_ddr/.Xil/
+Charlie/hdmi_working_camera_bram/__pycache__/
+Charlie/hdmi_working_camera_ddr/__pycache__/
+Charlie/hdmi_working_ddr_double_buf/v/
+Charlie/hdmi_working_ddr_double_buf/vivado/
+Charlie/hdmi_working_ddr_double_buf/myproj/
+Charlie/hdmi_working_ddr_double_buf/.Xil/
+Charlie/hdmi_working_ddr_double_buf/__pycache__/
+
+# ==========================================================
+# Vivado / Xilinx generated outputs (regenerated on build) -
+# applies to every project folder in the repo
+# ==========================================================
+*.cache/
+*.hw/
+*.sim/
+*.runs/
+*.gen/
+*.ip_user_files/
+**/.Xil/
+*.jou
+*.str
+*.wdb
+*.pb
+*.dcp
+*.ltx
+*.backup.jou
+*.backup.log
+
+# Vitis / SDK / build outputs
+.metadata/
+*.elf
+
+# ==========================================================
+# Python / Jupyter
+# ==========================================================
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# ==========================================================
+# OS / editor junk
+# ==========================================================
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+*.swp
+.vscode/

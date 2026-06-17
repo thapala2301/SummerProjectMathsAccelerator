@@ -47,7 +47,7 @@ module march_core(
 localparam FP_ZERO = 27'h0;
 localparam int RG_LAT = 48;
 localparam int REPEAT_LAT = 64;
-localparam int SCENE_CORE_LAT = 50; // sphere_sdf = 37, scaffold_sdf = 50, twisted_torus_sdf = 101
+localparam int SCENE_CORE_LAT = 77; // menger_sdf = 77, sphere_sdf = 37, scaffold_sdf = 50
 localparam int SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
@@ -148,7 +148,7 @@ state_pipe #(.WIDTH(1), .DEPTH(RG_LAT)) inst1_in_valid(.clk(clk), .in(in_valid),
 
 //Stage 2: scene_sdf, 103 clk delay pipeline on 150Mhz FOR MODULUS VERSION. IF USING LUT BASED MOD SWITCH TO 44 CLK
 logic [26:0] sdf_dist;
-scaffold_sdf inst1_scene_sdf(
+menger_sdf inst1_scene_sdf(
     .clk(clk),
     .px(s1_scene_pos_x),
     .py(s1_scene_pos_y),
