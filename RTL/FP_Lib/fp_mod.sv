@@ -14,7 +14,7 @@ module fp_mod (
 );
 
 logic [26:0] b_d, a_d, floor_a_b, a_b, b_floor_div;
-fp_division u_dividea_b(.clk(clk), .a(a), .b(b), .a_over_b(a_b)); //uses a and b, obtain a/b - takes 40 clk
+fp_div u_dividea_b(.clk(clk), .a(a), .b(b), .a_over_b(a_b)); //uses a and b, obtain a/b - takes 40 clk
 fp_floor u_floora_b (.clk(clk), .a(a_b), .floor_a(floor_a_b)); //takes 0 clk, comb, gets floor(a/b)
 
 state_pipe #(.WIDTH(27), .DEPTH(44)) u_state_pipe_a (.clk(clk), .in(b), .out(b_d));

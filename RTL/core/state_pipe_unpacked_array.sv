@@ -5,7 +5,7 @@ Unpacked array version
 */
 module state_pipe_unpacked_array #(
     parameter WIDTH =32,
-    parameter NB_ELEMENTS = 16
+    parameter NB_ELEMENTS = 16,
     parameter DEPTH = 1 //the latency in clock cycles
 )( 
     input wire clk,
@@ -17,7 +17,7 @@ module state_pipe_unpacked_array #(
 //(* shreg_extract = "no" *) reg [WIDTH-1:0] pipe [0:DEPTH-1];
 //but this blows up ff count
 
-reg [WIDTH-1:0] pipe [0:DEPTH-1];
+reg [WIDTH-1:0] pipe [0:DEPTH-1][0:NB_ELEMENTS-1];
 integer i;
 always @(posedge clk) begin
     pipe[0] <= in;

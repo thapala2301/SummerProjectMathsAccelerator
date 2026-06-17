@@ -7,8 +7,8 @@ pipeline_ready low: pause
 */
 module pixel_dispatch #(
     //controls resolution
-    parameter WIDTH = 512;
-    parameter HEIGHT = 300;
+    parameter WIDTH = 512,
+    parameter HEIGHT = 300
 )
     (
     input  logic        clk,

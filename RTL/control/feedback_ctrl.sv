@@ -63,7 +63,7 @@ module feedback_ctrl (
 
     //fifo inst
     FIFO #(
-        .WIDTH(190), //INCLUDE DIST IN BUS
+        .WIDTH(190), //INCLUDE DIST IN BUS ltr
         .DEPTH(512), 
         .ALMOST_FULL_LEVEL(384)
     ) fifo_inst (
@@ -72,7 +72,7 @@ module feedback_ctrl (
         .wr_en(fb_validity),
         .wr_data({fb_pix_id, fb_pos_x[26:0], fb_pos_y[26:0], fb_pos_z[26:0],
                   fb_ray_dir_x[26:0], fb_ray_dir_y[26:0], fb_ray_dir_z[26:0],
-                  fb_iteration_count, fb_dist}),
+                  fb_iteration_count}),
         .rd_en(fifo_rd_en),
         .rd_data(fifo_rd_data),
         .FIFO_FULL(fifo_full),
@@ -103,15 +103,16 @@ module feedback_ctrl (
             //existing pixel (already marched) dispatch
             out_x               <= 1'b0; //0 placeholder for X/don't care: we have already marched the ray so don't care about initial pos on screen
             out_y               <= 1'b0;
-            out_pix_id          <= fifo_rd_data[216:197]; //send the actual data to continue marching
-            out_pos_x           <= fifo_rd_data[196:170];
-            out_pos_y           <= fifo_rd_data[169:143];
-            out_pos_z           <= fifo_rd_data[142:116];
-            out_ray_dir_x       <= fifo_rd_data[115:89];
-            out_ray_dir_y       <= fifo_rd_data[88:62];
-            out_ray_dir_z       <= fifo_rd_data[61:35];
-            out_iteration_count <= fifo_rd_data[34:27];
-            out_dist <= fifo_rd_data[26:0];
+ //send the actual data to continue marching
+            out_pix_id          <= fifo_rd_data[189:170];
+            out_pos_x           <= fifo_rd_data[169:143];
+            out_pos_y           <= fifo_rd_data[142:116];
+            out_pos_z           <= fifo_rd_data[115:89];
+            out_ray_dir_x       <= fifo_rd_data[88:62];
+            out_ray_dir_y       <= fifo_rd_data[61:35];
+            out_ray_dir_z       <= fifo_rd_data[34:8];
+            out_iteration_count <= fifo_rd_data[7:0];
+            out_dist            <= 27'h0;
             out_validity        <= 1'b1;
         end
         else if (fifo_empty && pipeline_ready && valid) begin

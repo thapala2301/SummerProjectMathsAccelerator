@@ -43,6 +43,7 @@ logic [80:0]  cam_origin_flat;
 logic [31:0]  frame_base_0;
 logic [31:0]  frame_base_1;
 logic [319:0] scene_ctrl_flat;
+assign scene_ctrl_flat = '0;
 logic [31:0]  vid_data;
 logic [23:0]  bd_vid_data;
 logic         vid_hsync;
@@ -132,14 +133,15 @@ control_bd_wrapper inst1_ps_bd (
     .cam_origin_flat(cam_origin_flat),
     .frame_base_0(frame_base_0),
     .frame_base_1(frame_base_1),
-    .scene_ctrl_flat(scene_ctrl_flat),
     .pixel_clk_in(pixel_clk_out),
     .pixel_aresetn_in(pixel_aresetn_out),
     .vid_data(bd_vid_data),
     .vid_hsync(vid_hsync),
     .vid_vsync(vid_vsync),
     .vid_active(vid_active),
-    .frame_status(frame_status),
+    .frame_ready_valid(frame_status[1]),
+    .frame_ready_bank(frame_status[0]),
+    .btns(3'b0),
     .frame_ack(bd_frame_ack)
 );
 

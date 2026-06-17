@@ -40,7 +40,7 @@ module march_core(
     output logic [26:0]fb_pos_z,
     output logic [19:0]fb_pix_id,
     output logic [26:0] fb_dist, //give curr dist back to feedback control
-    output logic fb_valid,
+    output logic fb_valid
 
     );
 

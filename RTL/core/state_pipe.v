@@ -15,12 +15,16 @@ module state_pipe #(
 //(* shreg_extract = "no" *) reg [WIDTH-1:0] pipe [0:DEPTH-1];
 //but this blows up ff count
 reg [WIDTH-1:0] pipe [0:DEPTH-1];
-integer i;
-always @(posedge clk) begin
+always @(posedge clk) 
     pipe[0] <= in;
-    for (i = 1; i< DEPTH; i = i+1)
-        pipe[i] <= pipe[i-1];
-end
+
+genvar g;
+generate
+    for (g = 1; g < DEPTH; g = g+1) begin : gen_pipe
+        always @(posedge clk)
+            pipe[g] <= pipe[g-1];
+    end
+endgenerate
 
 assign out = pipe[DEPTH-1];
 endmodule
