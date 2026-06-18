@@ -45,9 +45,13 @@ module march_core(
     );
 
 localparam FP_ZERO = 27'h0;
-localparam int RG_LAT = 48;
-localparam int REPEAT_LAT = 64;
-localparam int SCENE_CORE_LAT = 77; // menger_sdf = 77, sphere_sdf = 37, scaffold_sdf = 50
+//localparam int RG_LAT = 48; // old: before extra reg in ray_gen s1->s2 path
+localparam int RG_LAT = 49; // +1 cycle: added s1b register in ray_gen to fix 7.9ns timing path
+//localparam int REPEAT_LAT = 64; // old: fp_mod (Newton-Raphson, 52 cycles): 4+52+4+4=64
+localparam int REPEAT_LAT = 18; // fp_mod2 (cheap pow2, 6 cycles): 4+6+4+4=18
+//localparam int SCENE_CORE_LAT = 79; // old: before combine stage pipeline cut
+//localparam int SCENE_CORE_LAT = 80; // old: before fp_min chain split
+localparam int SCENE_CORE_LAT = 83; // menger_sdf: fp_min split + combine 2-stage = 83
 localparam int SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
@@ -126,7 +130,6 @@ repeat_mod_cell inst_repeat_scene_x(
     .half_cell(scene_half_cell),
     .q(s1_scene_pos_x)
 );
-
 repeat_mod_cell inst_repeat_scene_y(
     .clk(clk),
     .p(s1_pos_y),
@@ -134,7 +137,6 @@ repeat_mod_cell inst_repeat_scene_y(
     .half_cell(scene_half_cell),
     .q(s1_scene_pos_y)
 );
-
 repeat_mod_cell inst_repeat_scene_z(
     .clk(clk),
     .p(s1_pos_z),

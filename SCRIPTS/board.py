@@ -4,7 +4,8 @@ import time
 
 import numpy as np
 from pynq import MMIO, allocate
-
+#from pynq import Overlay
+#ol = Overlay("/home/xilinx/jupyter_notebooks/Marcher_Vincent/MengerSpongeTest/menger_sponge_1core.bit")
 
 CAMERA_REG_BASE = 0x43C00000
 VDMA_BASE = 0x43000000
@@ -125,59 +126,6 @@ def init_vdma(vdma, frame0_addr, frame1_addr):
     vdma.write(MM2S_VSIZE, HEIGHT)
 
 
-def decode_vdma_status(vdma):
-    sr = vdma.read(MM2S_DMASR)
-    cr = vdma.read(MM2S_DMACR)
-    halted   = bool(sr & 0x01)
-    idle     = bool(sr & 0x02)
-    int_err  = bool(sr & 0x10)
-    slv_err  = bool(sr & 0x20)
-    dec_err  = bool(sr & 0x40)
-    err_str  = f"INT={int_err} SLV={slv_err} DEC={dec_err}" if (int_err or slv_err or dec_err) else "OK"
-    return f"VDMA DMACR=0x{cr:08x} DMASR=0x{sr:08x} halted={halted} idle={idle} errors={err_str}"
-
-
-def startup_selftest(camera_regs, vdma, gpio, frame0_addr, frame1_addr):
-    print()
-    print("=" * 60)
-    print("HARDWARE SELFTEST")
-    print("=" * 60)
-
-    raw = gpio.read(GPIO_DATA)
-    frv = bool((raw >> 1) & 1)
-    frb = bool(raw & 1)
-    tri  = gpio.read(GPIO_TRI)
-    tri2 = gpio.read(GPIO2_TRI)
-    print(f"  GPIO DATA=0x{raw:08x}  frame_ready_valid={frv}  frame_ready_bank={frb}")
-    print(f"  GPIO TRI =0x{tri:08x}  (want 0xFFFFFFFF)")
-    print(f"  GPIO2 TRI=0x{tri2:08x}  (want 0x00000000)")
-    if tri != 0xFFFFFFFF:
-        print("  [WARN] GPIO TRI wrong — reads will be garbage")
-    if tri2 != 0x00000000:
-        print("  [WARN] GPIO2 TRI wrong — frame_ack not driving output")
-
-    print(f"  {decode_vdma_status(vdma)}")
-    a1 = vdma.read(MM2S_START_ADDR_1)
-    a2 = vdma.read(MM2S_START_ADDR_2)
-    print(f"  VDMA ADDR1=0x{a1:08x} expect=0x{frame0_addr:08x} match={a1==frame0_addr}")
-    print(f"  VDMA ADDR2=0x{a2:08x} expect=0x{frame1_addr:08x} match={a2==frame1_addr}")
-    if a1 != frame0_addr or a2 != frame1_addr:
-        print("  [ERROR] VDMA frame addresses wrong")
-
-    fb0 = camera_regs.read(FRAME_BASE0_REG)
-    fb1 = camera_regs.read(FRAME_BASE1_REG)
-    print(f"  CAM FRAME_BASE0=0x{fb0:08x} expect=0x{frame0_addr:08x} match={fb0==frame0_addr}")
-    print(f"  CAM FRAME_BASE1=0x{fb1:08x} expect=0x{frame1_addr:08x} match={fb1==frame1_addr}")
-    if fb0 != frame0_addr or fb1 != frame1_addr:
-        print("  [ERROR] Camera frame base regs wrong — PL writes to wrong memory, dispatch never starts")
-
-    print("=" * 60)
-    print()
-
-
-_frame_stats = {"count": 0, "first_t": None, "start_t": time.monotonic()}
-
-
 def service_frame_ready(gpio, vdma, ack_state):
     now = time.monotonic()
     status = gpio.read(GPIO_DATA)
@@ -196,27 +144,30 @@ def service_frame_ready(gpio, vdma, ack_state):
         ack_state["active"] = True
         ack_state["release_at"] = now + FRAME_ACK_PULSE_S
 
-        _frame_stats["count"] += 1
-        if _frame_stats["first_t"] is None:
-            _frame_stats["first_t"] = now
-            print(f"[FRAME] First frame after {now - _frame_stats['start_t']:.2f}s  bank={ready_bank}")
-        elif (_frame_stats["count"] % 30) == 0:
-            fps = _frame_stats["count"] / (now - _frame_stats["first_t"])
-            print(f"[FRAME] count={_frame_stats['count']}  fps={fps:.2f}  bank={ready_bank}")
-
 
 def read_debug_state(gpio):
     value = gpio.read(GPIO_DATA)
-    # NOTE: only bits 0-1 are wired in the BD (bank, valid). Bits 2+ are 0.
-    frv = bool((value >> 1) & 1)
-    frb = bool(value & 1)
-    return value, frv, frb
+    state = (value >> 4) & 0xF
+    top_flags = {
+        "frame_ready_valid": bool((value >> 1) & 1),
+        "frame_ready_bank": bool(value & 1),
+        "dispatch_enable": bool((value >> 2) & 1),
+        "frame_drain_wait": bool((value >> 3) & 1),
+    }
+    dispatch_hi = (value >> 8) & 0xFF
+    done_hi = (value >> 16) & 0xFF
+    frame_counter = (value >> 24) & 0xFF
+    return value, state, DEBUG_STATES.get(state, "unknown"), top_flags, dispatch_hi, done_hi, frame_counter
 
 
 def format_debug_status(gpio):
-    value, frv, frb = read_debug_state(gpio)
-    frames = _frame_stats["count"]
-    return f"GPIO=0x{value:08x} frame_ready_valid={frv} frame_ready_bank={frb} frames_rendered={frames}"
+    value, state, state_name, top_flags, dispatch_hi, done_hi, frame_counter = read_debug_state(gpio)
+    active_top = [name for name, enabled in top_flags.items() if enabled]
+    return (
+        f"debug=0x{value:08x}; state={state}:{state_name}; "
+        f"frame={frame_counter}; dispatch_hi=0x{dispatch_hi:02x}; done_hi=0x{done_hi:02x}; "
+        f"top={','.join(active_top) if active_top else '-'}; "
+    )
 
 
 def recv_exact(conn, byte_count, on_timeout=None):
@@ -246,25 +197,51 @@ def main():
     frame0_addr = phys_addr(frame0)
     frame1_addr = phys_addr(frame1)
 
+    # frame_base must be written before camera_commit so the commit latches
+    # the correct addresses, not the reset value (0).
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+
     ack_state = {"active": False, "release_at": 0.0}
     gpio.write(GPIO_TRI, 0xFFFFFFFF)
     gpio.write(GPIO2_TRI, 0x00000000)
     gpio.write(GPIO2_DATA, 0)
 
-    write_camera_values(camera_regs, DEFAULT_CAMERA)
-    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
-    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
     init_vdma(vdma, frame0_addr, frame1_addr)
-    time.sleep(0.1)
 
     print(f"FRAME0 phys = 0x{frame0_addr:08x}")
     print(f"FRAME1 phys = 0x{frame1_addr:08x}")
-    startup_selftest(camera_regs, vdma, gpio, frame0_addr, frame1_addr)
-    print(format_debug_status(gpio))
+
+    # --- AXI register readback debug ---
+    fb0_rb = camera_regs.read(FRAME_BASE0_REG)
+    fb1_rb = camera_regs.read(FRAME_BASE1_REG)
+    commit_rb = camera_regs.read(CAMERA_COMMIT_REG)
+    print(f"AXI cam reg readback: frame_base0=0x{fb0_rb:08x} frame_base1=0x{fb1_rb:08x} commit=0x{commit_rb:08x}")
+    print(f"  frame_base_valid = {fb0_rb != 0 and fb1_rb != 0}")
+    lookat_rb = [camera_regs.read(i * 4) for i in range(9)]
+    orig_rb   = [camera_regs.read((9 + i) * 4) for i in range(3)]
+    print(f"  lookat[0..8] = {[hex(v) for v in lookat_rb]}")
+    print(f"  cam_origin   = {[hex(v) for v in orig_rb]}")
+    vdma_sr = vdma.read(MM2S_DMASR)
+    print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")
+    # poll gpio for up to 30s watching for frame_ready_valid (bit 1) to go high
+    print("Polling GPIO for frame_ready_valid (up to 30s)...")
+    for i in range(300):
+        time.sleep(0.1)
+        raw = gpio.read(GPIO_DATA)
+        frame_ready_valid_bit = (raw >> 1) & 1
+        frame_ready_bank_bit  = raw & 1
+        if frame_ready_valid_bit:
+            print(f"  t+{(i+1)*100}ms: FRAME READY! raw=0x{raw:08x} bank={frame_ready_bank_bit}")
+            break
+        if (i % 10) == 9:
+            print(f"  t+{(i+1)*100}ms: waiting... raw=0x{raw:08x}")
+    else:
+        print("  TIMEOUT: frame_ready_valid never went high after 30s")
+    # ---
+
     print(f"Waiting for camera controller on TCP port {TCP_PORT}")
-    _frame_stats["start_t"] = time.monotonic()
-    no_frame_warn_at = time.monotonic() + 15.0
-    no_frame_warned = False
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -274,16 +251,6 @@ def main():
 
     try:
         while True:
-            if not no_frame_warned and _frame_stats["first_t"] is None and time.monotonic() >= no_frame_warn_at:
-                no_frame_warned = True
-                raw = gpio.read(GPIO_DATA)
-                print()
-                print("[WARN] No frame after 15s — render pipeline stuck")
-                print(f"  GPIO raw=0x{raw:08x}  frame_ready_valid={bool((raw>>1)&1)}")
-                print(f"  {decode_vdma_status(vdma)}")
-                print("  Likely: wrong bitstream, wrong address map, or frame_base regs 0 in PL")
-                print()
-
             try:
                 conn, addr = server.accept()
             except socket.timeout:
@@ -322,6 +289,72 @@ def main():
         frame0.freebuffer()
         frame1.freebuffer()
 
+
+def run(stop_event=None):
+    camera_regs = MMIO(CAMERA_REG_BASE, SPAN)
+    vdma        = MMIO(VDMA_BASE, SPAN)
+    gpio        = MMIO(GPIO_BASE, SPAN)
+
+    frame0 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame1 = allocate(shape=(HEIGHT, WIDTH), dtype=np.uint32, cacheable=False)
+    frame0[:] = 0
+    frame1[:] = 0
+    frame0_addr = phys_addr(frame0)
+    frame1_addr = phys_addr(frame1)
+
+    # Write frame_base before camera_commit so the hardware latches the correct
+    # addresses. Then send ack pulses after commit so the hardware uses those
+    # addresses when it starts the first dispatch.
+    camera_regs.write(FRAME_BASE0_REG, frame0_addr)
+    camera_regs.write(FRAME_BASE1_REG, frame1_addr)
+    write_camera_values(camera_regs, DEFAULT_CAMERA)
+
+    ack_state = {"active": False, "release_at": 0.0}
+    gpio.write(GPIO_TRI,   0xFFFFFFFF)
+    gpio.write(GPIO2_TRI,  0x00000000)
+    for _ in range(4):
+        gpio.write(GPIO2_DATA, 1)
+        time.sleep(0.005)
+        gpio.write(GPIO2_DATA, 0)
+        time.sleep(0.005)
+
+    init_vdma(vdma, frame0_addr, frame1_addr)
+    vdma_sr = vdma.read(MM2S_DMASR)
+    print(f"FRAME0=0x{frame0_addr:08x} FRAME1=0x{frame1_addr:08x}")
+    print(f"VDMA SR=0x{vdma_sr:08x} ({'HALTED' if vdma_sr & 1 else 'RUNNING'})")
+    print(format_debug_status(gpio))
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    server.bind(("0.0.0.0", TCP_PORT))
+    server.listen(1)
+    server.settimeout(0.5)
+
+    def _should_stop():
+        return stop_event is not None and stop_event.is_set()
+
+    try:
+        while not _should_stop():
+            try:
+                conn, addr = server.accept()
+            except socket.timeout:
+                service_frame_ready(gpio, vdma, ack_state)
+                continue
+            conn.settimeout(0.5)
+            with conn:
+                while not _should_stop():
+                    packet = recv_exact(conn, CAMERA_PACKET_BYTES,
+                                        lambda: service_frame_ready(gpio, vdma, ack_state))
+                    if packet is None:
+                        service_frame_ready(gpio, vdma, ack_state)
+                        break
+                    write_camera_values(camera_regs, struct.unpack("<12f", packet))
+                    service_frame_ready(gpio, vdma, ack_state)
+    finally:
+        server.close()
+        frame0.freebuffer()
+        frame1.freebuffer()
 
 if __name__ == "__main__":
     main()

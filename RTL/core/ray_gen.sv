@@ -122,12 +122,21 @@ module ray_gen #(
         s1_dz <= FOV_Z_CONST_X2; //carry through scaling
     end
 
+    // s1b: extra register to break s1_dy -> fp_int2fp -> u_normalize timing path (~7.9ns)
+    logic [31:0] s1b_dx, s1b_dy;
+    logic [26:0] s1b_dz;
+    always_ff @(posedge clk) begin
+        s1b_dx <= s1_dx;
+        s1b_dy <= s1_dy;
+        s1b_dz <= s1_dz;
+    end
+
     //s2 fp_int2fp convert int offset to 27bit float
     logic [26:0] s2_dx_f, s2_dy_f, s2_dz_f;
     always_ff @(posedge clk) begin
-        s2_dx_f <= fp_int2fp(s1_dx[15:0]);
-        s2_dy_f <= fp_int2fp(s1_dy[15:0]);
-        s2_dz_f <= s1_dz;
+        s2_dx_f <= fp_int2fp(s1b_dx[15:0]);
+        s2_dy_f <= fp_int2fp(s1b_dy[15:0]);
+        s2_dz_f <= s1b_dz;
     end
 
     //obtain the normalized vector for dx,dy,dz : dirx, diry, dz. vec/norm computation

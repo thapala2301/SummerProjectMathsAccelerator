@@ -13,14 +13,12 @@ module FIFO #(
     input  logic              wr_en,
     input  logic [WIDTH-1:0]  wr_data,
     input  logic              rd_en,
-    output logic [WIDTH-1:0]  rd_data,
+    output logic [WIDTH-1:0]  rd_data, // registered (synchronous read — required for BRAM inference)
     output logic              FIFO_FULL,
     output logic              FIFO_EMPTY,
     output logic FIFO_ALMOST_FULL
 );
-    //infer as BRAM, saves 2200 luts and we have lots of bram headroom
-    // TO INFER AS BRAM : IN FRONT: (* ram_style = "block" *) 
-    logic [WIDTH-1:0] mem [0:DEPTH-1];
+    (* ram_style = "block" *) logic [WIDTH-1:0] mem [0:DEPTH-1];
 
 
     logic [$clog2(DEPTH)-1:0] write_ptr;
@@ -61,7 +59,7 @@ module FIFO #(
         end
     end
     
-    assign rd_data = mem[read_ptr]; 
+    always_ff @(posedge clk) rd_data <= mem[read_ptr];
 
     // Full and empty flags
     assign FIFO_FULL  = (count == DEPTH_COUNT);

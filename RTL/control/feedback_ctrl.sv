@@ -58,8 +58,13 @@ module feedback_ctrl (
     logic         fifo_empty;
     logic         fifo_almost_full;
     logic fifo_rd_en;
+    logic fifo_rd_en_d; // 1-cycle delayed: fifo_rd_data valid the cycle this is high (sync BRAM read)
 
     assign fifo_rd_en = pipeline_ready && !fifo_empty;
+    always_ff @(posedge clk) begin
+        if (rst) fifo_rd_en_d <= 1'b0;
+        else     fifo_rd_en_d <= fifo_rd_en;
+    end
 
     //fifo inst
     FIFO #(
@@ -99,11 +104,10 @@ module feedback_ctrl (
             out_dist <= 1'b0;
             out_validity        <= 1'b0;
         end
-        else if (!fifo_empty && pipeline_ready) begin
-            //existing pixel (already marched) dispatch
-            out_x               <= 1'b0; //0 placeholder for X/don't care: we have already marched the ray so don't care about initial pos on screen
+        else if (fifo_rd_en_d) begin
+            //existing pixel (already marched) dispatch — fifo_rd_data valid now (1 cycle after rd_en)
+            out_x               <= 1'b0;
             out_y               <= 1'b0;
- //send the actual data to continue marching
             out_pix_id          <= fifo_rd_data[189:170];
             out_pos_x           <= fifo_rd_data[169:143];
             out_pos_y           <= fifo_rd_data[142:116];

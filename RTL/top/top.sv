@@ -44,9 +44,9 @@ module top #(
     output logic [2:0] hdmi_tx_data_p,
     output logic [2:0] hdmi_tx_data_n
 );
-localparam int RG_LAT = 48;
-localparam int REPEAT_LAT = 64;
-localparam int SCENE_CORE_LAT = 50; // sphere_sdf = 37, scaffold_sdf = 50, twisted_torus_sdf = 101
+localparam int RG_LAT = 49;          // +1 extra reg in ray_gen s1->s2 path
+localparam int REPEAT_LAT = 18;      // fp_mod2 (6 cycles): 4+6+4+4=18
+localparam int SCENE_CORE_LAT = 83; // menger_sdf: fp_min split + combine 2-stage
 localparam int SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT;
 localparam int STEP_LAT = 8;
 localparam int MAX_ITER = 128;
@@ -132,7 +132,7 @@ logic core_sel, core_sel_d;
 logic arb_pix_done;
 ray_gen u0_raygen (
     .clk(sys_clk),
-    .rst_n(rst_n),
+    .rst_n(~rst), // was rst_n (port=0 when button unpressed, kept ray_gen valid_out=0 forever)
     .pix_x(pd_x),
     .pix_y(pd_y),
     .pix_id_in(pd_pix_id),
@@ -225,7 +225,7 @@ assign ctrl_clk_out = sys_clk;
 assign ctrl_aresetn_out = ~rst;
 assign pixel_clk_out = clk_pixel;
 assign pixel_aresetn_out = ~rst;
-assign dispatch_pipeline_ready = ~(fc_stall_0 | fc_stall_1 ) & dispatch_enable & ~writer_fifo_almost_full;
+assign dispatch_pipeline_ready = ~fc_stall_0 & dispatch_enable & ~writer_fifo_almost_full;
 assign frame_base_valid = (frame_base_0 != 32'd0) && (frame_base_1 != 32'd0);
 assign frame_status = {frame_ready_valid, frame_ready_bank};
 assign hdmi_data = vid_active ? vid_data[23:0] : 24'd0;
@@ -302,7 +302,8 @@ always_ff @(posedge sys_clk) begin
         end
 
         if (dispatch_enable && pd_valid) begin
-            core_sel <= (core_sel ==2'd1) ? 2'd0 : core_sel + 1'b1;
+            // core_sel <= (core_sel ==2'd1) ? 2'd0 : core_sel + 1'b1; // 2-core alternation
+            core_sel <= 2'd0;
             if (dispatch_count == FRAME_RAY_COUNT - 1'b1) begin
                 dispatch_count <= 20'd0;
                 dispatch_enable <= 1'b0;
@@ -354,7 +355,7 @@ end
 
 assign arb_pix_done = mc_pix_done_0 | mc_pix_done_1;
 
-state_pipe #(.WIDTH(1), .DEPTH(48)) pipe_core_sel(.clk(sys_clk), .in(core_sel), .out(core_sel_d));
+state_pipe #(.WIDTH(1), .DEPTH(RG_LAT)) pipe_core_sel(.clk(sys_clk), .in(core_sel), .out(core_sel_d));
 
 pixel_dispatch inst1_px_disp(
     .clk(sys_clk),
@@ -370,7 +371,7 @@ feedback_ctrl inst0_fb_ctrl(
     .rst(rst),
     .x_pixel(pd_x),
     .y_pixel(pd_y),
-    .valid(pd_valid & (core_sel == 2'd0)),
+    .valid(pd_valid), // was: pd_valid & (core_sel == 2'd0)
     .pix_id(pd_pix_id),
     .fb_pix_id(mc_fb_pix_id_0),
     .fb_pos_x({5'b0, mc_fb_pos_x_0}),
@@ -396,36 +397,37 @@ feedback_ctrl inst0_fb_ctrl(
     .stall(fc_stall_0)
 );
 
-feedback_ctrl inst1_fb_ctrl(
-    .clk(sys_clk),
-    .rst(rst),
-    .x_pixel(pd_x),
-    .y_pixel(pd_y),
-    .valid(pd_valid & (core_sel == 2'd1)),
-    .pix_id(pd_pix_id),
-    .fb_pix_id(mc_fb_pix_id_1),
-    .fb_pos_x({5'b0, mc_fb_pos_x_1}),
-    .fb_pos_y({5'b0, mc_fb_pos_y_1}),
-    .fb_pos_z({5'b0, mc_fb_pos_z_1}),
-    .fb_ray_dir_x({5'b0, mc_fb_dir_x_1}),
-    .fb_ray_dir_y({5'b0, mc_fb_dir_y_1}),
-    .fb_ray_dir_z({5'b0, mc_fb_dir_z_1}),
-    .fb_iteration_count(mc_fb_iter_1),
-    .fb_validity(mc_fb_valid_1),
-    .pipeline_ready(1'b1),
-    .out_x(fc_x_1),
-    .out_y(fc_y_1),
-    .out_pix_id(fc_pix_id_1),
-    .out_pos_x(fc_pos_x_1),
-    .out_pos_y(fc_pos_y_1),
-    .out_pos_z(fc_pos_z_1),
-    .out_ray_dir_x(fc_dir_x_1),
-    .out_ray_dir_y(fc_dir_y_1),
-    .out_ray_dir_z(fc_dir_z_1),
-    .out_iteration_count(fc_iter_1),
-    .out_validity(fc_valid_1),
-    .stall(fc_stall_1)
-);
+// feedback_ctrl inst1_fb_ctrl( // 2-core: commented out for 1-core build
+//     .clk(sys_clk),
+//     .rst(rst),
+//     .x_pixel(pd_x),
+//     .y_pixel(pd_y),
+//     .valid(pd_valid & (core_sel == 2'd1)),
+//     .pix_id(pd_pix_id),
+//     .fb_pix_id(mc_fb_pix_id_1),
+//     .fb_pos_x({5'b0, mc_fb_pos_x_1}),
+//     .fb_pos_y({5'b0, mc_fb_pos_y_1}),
+//     .fb_pos_z({5'b0, mc_fb_pos_z_1}),
+//     .fb_ray_dir_x({5'b0, mc_fb_dir_x_1}),
+//     .fb_ray_dir_y({5'b0, mc_fb_dir_y_1}),
+//     .fb_ray_dir_z({5'b0, mc_fb_dir_z_1}),
+//     .fb_iteration_count(mc_fb_iter_1),
+//     .fb_validity(mc_fb_valid_1),
+//     .pipeline_ready(1'b1),
+//     .out_x(fc_x_1),
+//     .out_y(fc_y_1),
+//     .out_pix_id(fc_pix_id_1),
+//     .out_pos_x(fc_pos_x_1),
+//     .out_pos_y(fc_pos_y_1),
+//     .out_pos_z(fc_pos_z_1),
+//     .out_ray_dir_x(fc_dir_x_1),
+//     .out_ray_dir_y(fc_dir_y_1),
+//     .out_ray_dir_z(fc_dir_z_1),
+//     .out_iteration_count(fc_iter_1),
+//     .out_validity(fc_valid_1),
+//     .stall(fc_stall_1)
+// );
+assign fc_stall_1 = 1'b0;
 
 march_core inst0_mc(
     .clk(sys_clk),
@@ -442,7 +444,7 @@ march_core inst0_mc(
     .rg_dir(rg_dir),
     .rg_orig(rg_orig),
     .rg_pix_id(rg_pix_id),
-    .rg_valid(rg_valid & (core_sel_d == 2'd0)),
+    .rg_valid(rg_valid), // was: rg_valid & (core_sel_d == 2'd0)
     .scene_cell_sz(scene_cell_sz_frame),
     .scene_half_cell(scene_half_cell_frame),
     .scene_shape_size(scene_shape_size_frame),
@@ -462,40 +464,43 @@ march_core inst0_mc(
     .in_dist(27'h0)
 );
 
-march_core inst1_mc(
-    .clk(sys_clk),
-    .rst_n(~rst),
-    .in_pix_id(fc_pix_id_1),
-    .in_pos_x(fc_pos_x_1),
-    .in_pos_y(fc_pos_y_1),
-    .in_pos_z(fc_pos_z_1),
-    .in_ray_dir_x(fc_dir_x_1),
-    .in_ray_dir_y(fc_dir_y_1),
-    .in_ray_dir_z(fc_dir_z_1),
-    .in_iter(fc_iter_1),
-    .in_valid(fc_valid_1),
-    .rg_dir(rg_dir),
-    .rg_orig(rg_orig),
-    .rg_pix_id(rg_pix_id),
-    .rg_valid(rg_valid & (core_sel_d == 2'd1)),
-    .scene_cell_sz(scene_cell_sz_frame),
-    .scene_half_cell(scene_half_cell_frame),
-    .scene_shape_size(scene_shape_size_frame),
-    .scene_shape_extra(scene_shape_extra_frame),
-    .pix_done(mc_pix_done_1),
-    .out_pix_id(mc_out_pix_id_1),
-    .out_iter(mc_out_iter_1),
-    .fb_iter(mc_fb_iter_1),
-    .fb_ray_dir_x(mc_fb_dir_x_1),
-    .fb_ray_dir_y(mc_fb_dir_y_1),
-    .fb_ray_dir_z(mc_fb_dir_z_1),
-    .fb_pos_x(mc_fb_pos_x_1),
-    .fb_pos_y(mc_fb_pos_y_1),
-    .fb_pos_z(mc_fb_pos_z_1),
-    .fb_pix_id(mc_fb_pix_id_1),
-    .fb_valid(mc_fb_valid_1),
-    .in_dist(27'h0)
-);
+// march_core inst1_mc( // 2-core: commented out for 1-core build
+//     .clk(sys_clk),
+//     .rst_n(~rst),
+//     .in_pix_id(fc_pix_id_1),
+//     .in_pos_x(fc_pos_x_1),
+//     .in_pos_y(fc_pos_y_1),
+//     .in_pos_z(fc_pos_z_1),
+//     .in_ray_dir_x(fc_dir_x_1),
+//     .in_ray_dir_y(fc_dir_y_1),
+//     .in_ray_dir_z(fc_dir_z_1),
+//     .in_iter(fc_iter_1),
+//     .in_valid(fc_valid_1),
+//     .rg_dir(rg_dir),
+//     .rg_orig(rg_orig),
+//     .rg_pix_id(rg_pix_id),
+//     .rg_valid(rg_valid & (core_sel_d == 2'd1)),
+//     .scene_cell_sz(scene_cell_sz_frame),
+//     .scene_half_cell(scene_half_cell_frame),
+//     .scene_shape_size(scene_shape_size_frame),
+//     .scene_shape_extra(scene_shape_extra_frame),
+//     .pix_done(mc_pix_done_1),
+//     .out_pix_id(mc_out_pix_id_1),
+//     .out_iter(mc_out_iter_1),
+//     .fb_iter(mc_fb_iter_1),
+//     .fb_ray_dir_x(mc_fb_dir_x_1),
+//     .fb_ray_dir_y(mc_fb_dir_y_1),
+//     .fb_ray_dir_z(mc_fb_dir_z_1),
+//     .fb_pos_x(mc_fb_pos_x_1),
+//     .fb_pos_y(mc_fb_pos_y_1),
+//     .fb_pos_z(mc_fb_pos_z_1),
+//     .fb_pix_id(mc_fb_pix_id_1),
+//     .fb_valid(mc_fb_valid_1),
+//     .in_dist(27'h0)
+// );
+assign mc_pix_done_1   = 1'b0;
+assign mc_out_pix_id_1 = 20'h0;
+assign mc_out_iter_1   = 8'h0;
 
 assign arb_out_pix_id = mc_pix_done_0 ? mc_out_pix_id_0 : mc_out_pix_id_1;
 assign arb_out_iter   = mc_pix_done_0 ? mc_out_iter_0   : mc_out_iter_1;
