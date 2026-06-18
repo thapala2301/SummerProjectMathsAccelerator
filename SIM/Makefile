@@ -40,6 +40,25 @@ VFLAGS = --cc --exe --build -sv \
 	-Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-CASEINCOMPLETE \
 	-Wno-CASEX
 
+VFLAGS_PPM = --cc --exe --build -sv \
+	--top-module menger_ppm_top \
+	-Wno-TIMESCALEMOD -Wno-UNOPTFLAT -Wno-WIDTH \
+	-Wno-UNUSED -Wno-PINCONNECTEMPTY -Wno-CASEINCOMPLETE \
+	-Wno-CASEX
+
+MENGER_SRCS = \
+	menger_ppm_top.sv \
+	$(CORE)/repeat_mod_cell.sv \
+	$(SDF)/menger_sdf.sv \
+	$(CORE)/state_pipe.v \
+	$(FP)/fp_add.v \
+	$(FP)/fp_sub.v \
+	$(FP)/fp_mul.v \
+	$(FP)/fp_abs.v \
+	$(FP)/fp_min.v \
+	$(FP)/fp_max.v \
+	$(FP)/fp_mod2.v
+
 all: build run
 
 build:
@@ -48,5 +67,11 @@ build:
 run:
 	./obj_dir/Vsim_top
 
+# RTL-accurate Menger SDF PPM: spot-checks + 256x256 XY slice render
+# Output: menger_rtl.ppm
+menger_ppm:
+	verilator $(VFLAGS_PPM) $(MENGER_SRCS) tb_menger_ppm_main.cpp -o Vmenger_ppm_top
+	./obj_dir/Vmenger_ppm_top
+
 clean:
-	rm -rf obj_dir frame.ppm screen.ppm frame.png screen.png
+	rm -rf obj_dir frame.ppm screen.ppm frame.png screen.png menger_rtl.ppm

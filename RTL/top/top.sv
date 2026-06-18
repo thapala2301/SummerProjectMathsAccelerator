@@ -148,10 +148,20 @@ ray_gen u0_raygen (
 );
 
 
-assign scene_cell_sz = scene_ctrl_flat[26:0];
-assign scene_half_cell = scene_ctrl_flat[58:32];
-assign scene_shape_size = scene_ctrl_flat[90:64];
-assign scene_shape_extra = scene_ctrl_flat[122:96];
+// top_ps.sv hardwires scene_ctrl_flat='0, so these would all be 0:
+// - half_cell=0 breaks repeat_mod_cell centering (p folds to [0,2) not [-1,1))
+// - scene_shape_size=0 makes menger box SDF = |p| (never hits)
+// -> hardcode Menger sponge constants until scene_ctrl AXI is wired.
+// cell_sz=2.0 matches fp_mod2 which does mod 2.0 exactly.
+// Restore original assigns below when scene_ctrl AXI is wired:
+// assign scene_cell_sz    = scene_ctrl_flat[26:0];
+// assign scene_half_cell  = scene_ctrl_flat[58:32];
+// assign scene_shape_size = scene_ctrl_flat[90:64];
+// assign scene_shape_extra = scene_ctrl_flat[122:96];
+assign scene_cell_sz    = 27'h2000000; // FP27 2.0
+assign scene_half_cell  = 27'h1FC0000; // FP27 1.0
+assign scene_shape_size = 27'h1FC0000; // FP27 1.0 (Menger box half-extent)
+assign scene_shape_extra = 27'h0;      // unused by menger_sdf
 assign scene_bg_rgb = scene_ctrl_flat[151:128];
 assign scene_shape_rgb = scene_ctrl_flat[183:160];
 assign scene_beat_pulse = scene_ctrl_flat[218:192];
