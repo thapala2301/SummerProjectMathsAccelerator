@@ -3,8 +3,6 @@ import struct
 import sys
 import time
 import math
-import random
-import colorsys
 from collections import deque
 from dataclasses import dataclass
 
@@ -35,8 +33,9 @@ MID_HZ = (215, 2000)
 TREBLE_HZ = (2000, 8000)
 MAX_BRIGHTNESS_HZ = 8000.0
 
-CELL_SZ = 10.0
-HALF_CELL = 5.0
+CELL_SZ_DEFAULT = 10.0
+CELL_SZ_EXPAND_SPAN = 10.0
+HALF_CELL_DEFAULT = 0.5 * CELL_SZ_DEFAULT
 
 SHAPE_SIZE_MIN = 3.6
 SHAPE_SIZE_MAX = 4.95
@@ -65,8 +64,16 @@ MOOD_ATTACK = 0.08
 MOOD_RELEASE = 0.02
 COLOR_PHASE_MIN_HZ = 0.015
 COLOR_PHASE_MAX_HZ = 0.16
-PALETTE_CYCLE_MIN_HZ = 0.0025
-PALETTE_CYCLE_MAX_HZ = 0.012
+
+CELL_PULSE_BEAT_DIVIDER = 2
+CELL_PULSE_MIN_INTERVAL_S = 0.55
+CELL_PULSE_MIN_STRENGTH = 0.42
+CELL_PULSE_STRONG_STRENGTH = 0.72
+CELL_PULSE_ATTACK_MIN = 0.06
+CELL_PULSE_ATTACK_MAX = 0.24
+CELL_PULSE_DECAY_WEAK = 0.965
+CELL_PULSE_DECAY_STRONG = 0.985
+CELL_PULSE_IDLE_DAMP = 0.92
 
 INPUT_FLOOR_ATTACK = 0.35
 INPUT_FLOOR_RELEASE = 0.003
@@ -131,16 +138,17 @@ class AudioState:
     mood_noise: float = 0.0
     motion_phase: float = 0.0
     color_phase: float = 0.0
-    palette_phase: float = 0.0
+    cell_expand: float = 0.0
+    cell_drive: float = 0.0
+    cell_attack: float = CELL_PULSE_ATTACK_MIN
+    cell_decay: float = CELL_PULSE_DECAY_WEAK
+    cell_beat_count: int = 0
+    cell_pulse_cooldown: float = 0.0
 
 
 sock = None
 energy_history = deque(maxlen=ENERGY_HISTORY)
-audio_state = AudioState(
-    motion_phase=random.random() * 2.0 * math.pi,
-    color_phase=random.random() * 2.0 * math.pi,
-    palette_phase=random.random() * 2.0 * math.pi,
-)
+audio_state = AudioState()
 last_beat_time = None
 last_callback_time = None
 input_floor = 0.0
@@ -202,23 +210,6 @@ def band_ratio(fft_mag, bins, total):
 
 def debug_bar(value, width=12):
     return ("#" * int(clamp01(value) * width)).ljust(width)
-
-
-def hue_mix(hues, weights):
-    x = 0.0
-    y = 0.0
-    for hue, weight in zip(hues, weights):
-        angle = 2.0 * math.pi * hue
-        x += weight * math.cos(angle)
-        y += weight * math.sin(angle)
-    if x == 0.0 and y == 0.0:
-        return 0.0
-    return (math.atan2(y, x) / (2.0 * math.pi)) % 1.0
-
-
-def hsv_rgb(hue, sat, val):
-    red, green, blue = colorsys.hsv_to_rgb(hue % 1.0, clamp01(sat), clamp01(val))
-    return (255.0 * red, 255.0 * green, 255.0 * blue)
 
 
 def mix_audio_samples(indata):
@@ -289,6 +280,55 @@ def extract_audio_features(audio_samples):
     return features, beat_trigger
 
 
+def beat_strength(features):
+    return clamp01(
+        0.38 * features.loudness +
+        0.28 * features.bass +
+        0.20 * audio_state.tempo +
+        0.14 * features.brightness
+    )
+
+
+def update_cell_spacing(dt, beat_onset, strength):
+    audio_state.cell_pulse_cooldown = max(0.0, audio_state.cell_pulse_cooldown - dt)
+
+    if beat_onset:
+        audio_state.cell_beat_count += 1
+
+        should_expand = (
+            audio_state.cell_pulse_cooldown <= 0.0 and
+            (
+                strength >= CELL_PULSE_STRONG_STRENGTH or
+                (
+                    audio_state.cell_beat_count >= CELL_PULSE_BEAT_DIVIDER and
+                    strength >= CELL_PULSE_MIN_STRENGTH
+                )
+            )
+        )
+
+        if should_expand:
+            audio_state.cell_beat_count = 0
+            audio_state.cell_drive = max(
+                audio_state.cell_drive,
+                0.10 + 0.90 * strength
+            )
+            audio_state.cell_attack = (
+                CELL_PULSE_ATTACK_MIN +
+                (CELL_PULSE_ATTACK_MAX - CELL_PULSE_ATTACK_MIN) * strength
+            )
+            audio_state.cell_decay = (
+                CELL_PULSE_DECAY_WEAK +
+                (CELL_PULSE_DECAY_STRONG - CELL_PULSE_DECAY_WEAK) * strength
+            )
+            audio_state.cell_pulse_cooldown = CELL_PULSE_MIN_INTERVAL_S * (1.0 - 0.35 * strength)
+
+    audio_state.cell_expand += audio_state.cell_attack * (audio_state.cell_drive - audio_state.cell_expand)
+    audio_state.cell_drive *= audio_state.cell_decay
+
+    if audio_state.level < 0.05:
+        audio_state.cell_drive *= CELL_PULSE_IDLE_DAMP
+
+
 def update_audio_state(features, beat_trigger):
     global last_beat_time, last_callback_time
 
@@ -311,9 +351,11 @@ def update_audio_state(features, beat_trigger):
     )
 
     beat_onset = False
+    trigger_strength = 0.0
     if beat_trigger:
         if last_beat_time is None or (now - last_beat_time) >= MIN_BEAT_INTERVAL_S:
             beat_onset = True
+            trigger_strength = beat_strength(features)
             if last_beat_time is not None:
                 bpm = clamp01((60.0 / (now - last_beat_time) - MIN_BPM) / (MAX_BPM - MIN_BPM))
                 audio_state.tempo = smooth_follow(audio_state.tempo, bpm, TEMPO_ATTACK, TEMPO_RELEASE)
@@ -378,16 +420,13 @@ def update_audio_state(features, beat_trigger):
     color_hz = COLOR_PHASE_MIN_HZ + (COLOR_PHASE_MAX_HZ - COLOR_PHASE_MIN_HZ) * color_drive
     audio_state.color_phase = (audio_state.color_phase + (2.0 * math.pi * color_hz * dt)) % (2.0 * math.pi)
 
-    palette_drive = clamp01(
-        0.45 * audio_state.mood_energy +
-        0.30 * audio_state.tempo +
-        0.25 * audio_state.mood_brightness
-    )
-    palette_hz = PALETTE_CYCLE_MIN_HZ + (PALETTE_CYCLE_MAX_HZ - PALETTE_CYCLE_MIN_HZ) * palette_drive
-    audio_state.palette_phase = (audio_state.palette_phase + (2.0 * math.pi * palette_hz * dt)) % (2.0 * math.pi)
+    update_cell_spacing(dt, beat_onset, trigger_strength)
 
 
 def build_scene_values():
+    cell_sz = CELL_SZ_DEFAULT + CELL_SZ_EXPAND_SPAN * clamp01(audio_state.cell_expand)
+    half_cell = 0.5 * cell_sz
+
     shape_size_mix = clamp01(
         0.32 +
         0.22 * audio_state.level +
@@ -444,6 +483,11 @@ def build_scene_values():
             0.35 * audio_state.tempo
         )
     )
+    palette_mix = clamp01(
+        0.55 * music_energy +
+        0.30 * section_lift +
+        0.15 * audio_state.beat_pulse
+    )
     palette_brightness = clamp01(
         0.12 +
         0.28 * audio_state.mood_energy +
@@ -453,46 +497,16 @@ def build_scene_values():
     )
     shade_wave = 0.5 + 0.5 * math.sin(audio_state.color_phase)
     shade_wave_offset = 0.5 + 0.5 * math.sin(audio_state.color_phase + 2.1)
-    base_hue = (audio_state.palette_phase / (2.0 * math.pi)) % 1.0
-    cool_hue = (0.58 + 0.06 * math.sin(audio_state.palette_phase * 0.37 + 0.9)) % 1.0
-    mystic_hue = (0.78 + 0.05 * math.sin(audio_state.palette_phase * 0.29 + 1.6)) % 1.0
-    warm_hue = (0.03 + 0.04 * math.sin(audio_state.palette_phase * 0.41 + 0.3)) % 1.0
 
-    palette_hue = hue_mix(
-        (base_hue, cool_hue, mystic_hue, warm_hue),
-        (
-            1.0,
-            0.75 * cool_bias,
-            0.70 * mystic_bias,
-            0.85 * warm_bias + 0.55 * aggression,
-        ),
-    )
-    bg_hue = (palette_hue + 0.03 * (shade_wave - 0.5) + 0.02 * (section_lift - 0.5)) % 1.0
-    shape_hue = (palette_hue + 0.05 + 0.04 * (shade_wave_offset - 0.5)) % 1.0
+    bg_cool = blend_rgb(BG_COOL, BG_MYSTIC, clamp01(0.25 + 0.75 * mystic_bias * shade_wave))
+    bg_cool = blend_rgb(BG_GLOOM, bg_cool, 0.18 + 0.30 * cool_bias + 0.10 * shade_wave_offset)
+    bg_warm = blend_rgb(BG_WARM, BG_HELL, clamp01(0.20 + 0.80 * aggression * shade_wave_offset))
+    bg_base = blend_rgb(bg_cool, bg_warm, palette_mix)
+    bg_ambient = blend_rgb(BG_GLOOM, bg_base, 0.18 + 0.36 * palette_brightness)
 
-    bg_sat = clamp01(
-        0.22 +
-        0.18 * palette_brightness +
-        0.20 * music_energy +
-        0.12 * section_lift
-    )
-    shape_sat = clamp01(
-        0.32 +
-        0.20 * palette_brightness +
-        0.22 * music_liveliness +
-        0.10 * aggression
-    )
-    bg_base = hsv_rgb(
-        bg_hue,
-        bg_sat,
-        0.05 + 0.14 * palette_brightness + 0.06 * shade_wave,
-    )
-    bg_flash = hsv_rgb(
-        bg_hue,
-        clamp01(bg_sat + 0.10 + 0.10 * shade_wave_offset),
-        0.10 + 0.22 * section_lift + 0.48 * audio_state.beat_pulse,
-    )
-    bg_ambient = blend_rgb(BG_GLOOM, bg_base, 0.16 + 0.34 * palette_brightness)
+    bg_flash = blend_rgb(FLASH_COOL, FLASH_MYSTIC, clamp01(0.25 + 0.75 * mystic_bias * shade_wave_offset))
+    bg_flash = blend_rgb(bg_flash, FLASH_WARM, warm_bias)
+    bg_flash = blend_rgb(bg_flash, FLASH_HELL, aggression)
     bg_rgb = rgb_u32(
         *add_rgb(
             scale_rgb(bg_ambient, 1.0),
@@ -500,16 +514,12 @@ def build_scene_values():
         )
     )
 
-    shape_base = hsv_rgb(
-        shape_hue,
-        shape_sat,
-        0.26 + 0.24 * palette_brightness + 0.12 * shade_wave,
-    )
-    shape_highlight = hsv_rgb(
-        shape_hue,
-        clamp01(shape_sat + 0.08 + 0.12 * shade_wave_offset),
-        0.36 + 0.28 * music_liveliness + 0.30 * audio_state.beat_pulse + 0.12 * section_lift,
-    )
+    shape_cool = blend_rgb(SHAPE_COOL, SHAPE_MYSTIC, clamp01(0.25 + 0.75 * mystic_bias * shade_wave))
+    shape_warm = blend_rgb(SHAPE_WARM, SHAPE_HELL, clamp01(0.25 + 0.75 * aggression * shade_wave_offset))
+    shape_base = blend_rgb(shape_cool, shape_warm, palette_mix)
+    shape_highlight = blend_rgb(SHAPE_COOL_HI, SHAPE_MYSTIC_HI, clamp01(0.30 + 0.70 * mystic_bias * shade_wave_offset))
+    shape_highlight = blend_rgb(shape_highlight, SHAPE_WARM_HI, warm_bias)
+    shape_highlight = blend_rgb(shape_highlight, SHAPE_HELL_HI, aggression)
     shape_rgb = rgb_u32(
         *add_rgb(
             scale_rgb(shape_base, 0.24 + 0.32 * palette_brightness + 0.12 * shade_wave),
@@ -518,8 +528,8 @@ def build_scene_values():
     )
 
     return (
-        CELL_SZ,
-        HALF_CELL,
+        cell_sz,
+        half_cell,
         generic_shape_size(shape_size),
         generic_shape_extra(shape_extra),
         bg_rgb,
@@ -550,6 +560,7 @@ def audio_callback(indata, frames, time_info, status):
                 f"treb[{debug_bar(audio_state.treble)}] lvl[{debug_bar(audio_state.level)}] "
                 f"spec[{debug_bar(audio_state.spectral)}] noise[{debug_bar(audio_state.noise)}] "
                 f"tempo[{debug_bar(audio_state.tempo)}] pulse[{debug_bar(audio_state.beat_pulse)}] "
+                f"cell[{debug_bar(audio_state.cell_expand)}] "
                 f"trig:{'X' if beat_trigger else '.'}  ",
                 end="",
                 flush=True,

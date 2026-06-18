@@ -1,6 +1,8 @@
 // march_core.sv: instantiate scaffold_sdf and set SCENE_CORE_LAT = 50
 // march_core.sv: set SCENE_CELL_SZ = 27'h2090000 and SCENE_HALF_CELL = 27'h2050000
 // ctrl.py: set CAMERA_WRAP_CELL_SZ = 10.0 and CAMERA_WRAP_HALF_CELL = 5.0
+// shape_size and shape_extra are frame-latched 0..1 controls.
+// This module maps them onto scaffold-specific box size and frame thickness.
 
 module scaffold_sdf(
     input         clk,
@@ -12,8 +14,21 @@ module scaffold_sdf(
     output reg [26:0] sdf_out
 );
 
-wire [26:0] b_fp = shape_size;
-wire [26:0] e_fp = shape_extra;
+localparam [26:0] SHAPE_SIZE_MIN  = 27'h203999A; // 3.8
+localparam [26:0] SHAPE_SIZE_SPAN = 27'h1FCCCCD; // 1.2 -> max 5.0
+localparam [26:0] SHAPE_EXTRA_MIN  = 27'h1EE6666; // 0.10
+localparam [26:0] SHAPE_EXTRA_SPAN = 27'h1F30A3D; // 0.22 -> max 0.32
+
+wire [26:0] shape_size_scaled;
+wire [26:0] shape_extra_scaled;
+wire [26:0] b_fp;
+wire [26:0] e_fp;
+
+fp_mul inst_shape_size_mul(.clk(clk), .a(shape_size), .b(SHAPE_SIZE_SPAN), .out(shape_size_scaled));
+fp_add inst_shape_size_add(.clk(clk), .a(SHAPE_SIZE_MIN), .b(shape_size_scaled), .out(b_fp));
+
+fp_mul inst_shape_extra_mul(.clk(clk), .a(shape_extra), .b(SHAPE_EXTRA_SPAN), .out(shape_extra_scaled));
+fp_add inst_shape_extra_add(.clk(clk), .a(SHAPE_EXTRA_MIN), .b(shape_extra_scaled), .out(e_fp));
 
 wire [26:0] abs_px;
 wire [26:0] abs_py;

@@ -68,6 +68,7 @@ DMACR_RUN_PARK = 0x00000001
 DMACR_RESET = 0x00000004
 FRAME_ACK_PULSE_S = 0.001
 FRAME_STATS_REPORT_S = 1.0
+FRAME_SERVICE_SLEEP_S = 0.001
 PRINT_LOCK = threading.Lock()
 
 DEFAULT_CAMERA = [
@@ -79,19 +80,6 @@ DEFAULT_CAMERA = [
 
 CAMERA_WRAP_CELL_SZ = 10.0
 CAMERA_WRAP_HALF_CELL = 5.0
-
-DEFAULT_SCENE = (
-    10.0,     # cell_sz
-    5.0,      # half_cell
-    5.0,      # shape_size
-    0.15,     # shape_extra
-    0x000000, # bg_rgb
-    0xFFFFFF, # shape_rgb
-    0.0,      # beat_pulse
-    0.0,      # level
-    0.0,      # spectral
-    0.0,      # noise
-)
 
 def log(message):
     with PRINT_LOCK:
@@ -219,6 +207,14 @@ def service_frame_ready(gpio, vdma, ack_state, frame_stats):
         ack_state["active"] = True
         ack_state["release_at"] = now + FRAME_ACK_PULSE_S
 
+def service_frames(gpio, vdma, stop_event):
+    ack_state = {"active": False, "release_at": 0.0}
+    frame_stats = {"count": 0, "report_at": time.monotonic()}
+
+    while not stop_event.is_set():
+        service_frame_ready(gpio, vdma, ack_state, frame_stats)
+        time.sleep(FRAME_SERVICE_SLEEP_S)
+
 def recv_exact(conn, byte_count, on_timeout=None):
     data = bytearray()
     while len(data) < byte_count:
@@ -274,14 +270,13 @@ def main():
     frame0_addr = phys_addr(frame0)
     frame1_addr = phys_addr(frame1)
 
-    ack_state = {"active": False, "release_at": 0.0}
-    frame_stats = {"count": 0, "report_at": time.monotonic()}
     gpio.write(GPIO_TRI, 0xFFFFFFFF)
     gpio.write(GPIO2_TRI, 0x00000000)
     gpio.write(GPIO2_DATA, 0)
 
     write_camera_values(camera_regs, DEFAULT_CAMERA)
-    write_scene_values(camera_regs, DEFAULT_SCENE)
+    # Leave scene registers at their hardware reset defaults so each SDF copy
+    # can define its own startup look while ctrl.py stays scene-agnostic.
     camera_regs.write(FRAME_BASE0_REG, frame0_addr)
     camera_regs.write(FRAME_BASE1_REG, frame1_addr)
     init_vdma(vdma, frame0_addr, frame1_addr)
@@ -293,6 +288,14 @@ def main():
     )
     audio_thread.start()
 
+    frame_stop_event = threading.Event()
+    frame_thread = threading.Thread(
+        target=service_frames,
+        args=(gpio, vdma, frame_stop_event),
+        daemon=True,
+    )
+    frame_thread.start()
+
     server = open_server(CAMERA_TCP_PORT, timeout=0.5)
     log(f"waiting for camera controller on TCP port {CAMERA_TCP_PORT}")
 
@@ -301,7 +304,6 @@ def main():
             try:
                 conn, addr = server.accept()
             except socket.timeout:
-                service_frame_ready(gpio, vdma, ack_state, frame_stats)
                 continue
 
             log(f"controls connected at: {addr}")
@@ -312,10 +314,8 @@ def main():
                     packet = recv_exact(
                         conn,
                         CAMERA_PACKET_BYTES,
-                        lambda: service_frame_ready(gpio, vdma, ack_state, frame_stats),
                     )
                     if packet is None:
-                        service_frame_ready(gpio, vdma, ack_state, frame_stats)
                         log("camera controller disconnected")
                         break
 
@@ -323,8 +323,8 @@ def main():
                         camera_regs,
                         struct.unpack(CAMERA_PACKET_FORMAT, packet),
                     )
-                    service_frame_ready(gpio, vdma, ack_state, frame_stats)
     finally:
+        frame_stop_event.set()
         server.close()
         frame0.freebuffer()
         frame1.freebuffer()

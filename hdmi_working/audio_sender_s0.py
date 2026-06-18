@@ -3,8 +3,6 @@ import struct
 import sys
 import time
 import math
-import random
-import colorsys
 from collections import deque
 from dataclasses import dataclass
 
@@ -47,36 +45,18 @@ GENERIC_SHAPE_SIZE_SPAN = 1.2
 GENERIC_SHAPE_EXTRA_MIN = 0.10
 GENERIC_SHAPE_EXTRA_SPAN = 0.22
 
-MIN_MOTION_HZ = 0.05
-MAX_MOTION_HZ = 1.20
+MIN_MOTION_HZ = 0.08
+MAX_MOTION_HZ = 1.80
 MIN_BEAT_INTERVAL_S = 0.22
 MIN_BPM = 60.0
 MAX_BPM = 180.0
 TEMPO_ATTACK = 0.25
 TEMPO_RELEASE = 0.08
-TEMPO_IDLE_DECAY = 0.02
 SILENCE_GATE = 0.3
 ENERGY_HISTORY = 20
 BEAT_THRESHOLD = 1.5
-BEAT_DECAY_SLOW = 0.992
-BEAT_DECAY_FAST = 0.94
-MIN_BEAT_LEVEL = 0.12
-MOOD_ATTACK = 0.08
-MOOD_RELEASE = 0.02
-COLOR_PHASE_MIN_HZ = 0.015
-COLOR_PHASE_MAX_HZ = 0.16
-PALETTE_CYCLE_MIN_HZ = 0.0025
-PALETTE_CYCLE_MAX_HZ = 0.012
-
-INPUT_FLOOR_ATTACK = 0.35
-INPUT_FLOOR_RELEASE = 0.003
-INPUT_PEAK_ATTACK = 0.60
-INPUT_PEAK_RELEASE = 0.01
-INPUT_FLOOR_BOOTSTRAP = 0.35
-INPUT_PEAK_BOOTSTRAP = 1.25
-MIN_SIGNAL_RANGE = 0.0015
-MIN_SIGNAL_LEVEL = 0.0002
-SIGNAL_PRESENT_FRACTION = 0.08
+BEAT_DECAY_SLOW = 0.96
+BEAT_DECAY_FAST = 0.88
 
 BAND_ATTACK = 0.35
 BAND_RELEASE = 0.18
@@ -89,19 +69,15 @@ ROUGHNESS_RELEASE = 0.12
 
 BG_GLOOM = (8.0, 12.0, 18.0)
 BG_COOL = (18.0, 42.0, 76.0)
-BG_MYSTIC = (28.0, 20.0, 46.0)
 BG_WARM = (54.0, 24.0, 12.0)
 BG_HELL = (84.0, 20.0, 8.0)
 FLASH_COOL = (64.0, 180.0, 255.0)
-FLASH_MYSTIC = (156.0, 118.0, 255.0)
 FLASH_WARM = (255.0, 156.0, 48.0)
 FLASH_HELL = (255.0, 72.0, 16.0)
 SHAPE_COOL = (90.0, 220.0, 255.0)
-SHAPE_MYSTIC = (176.0, 132.0, 255.0)
 SHAPE_WARM = (255.0, 190.0, 88.0)
 SHAPE_HELL = (255.0, 92.0, 36.0)
 SHAPE_COOL_HI = (170.0, 255.0, 255.0)
-SHAPE_MYSTIC_HI = (224.0, 202.0, 255.0)
 SHAPE_WARM_HI = (255.0, 228.0, 132.0)
 SHAPE_HELL_HI = (255.0, 168.0, 72.0)
 
@@ -126,25 +102,14 @@ class AudioState:
     noise: float = 0.0
     beat_pulse: float = 0.0
     tempo: float = 0.0
-    mood_energy: float = 0.0
-    mood_brightness: float = 0.0
-    mood_noise: float = 0.0
     motion_phase: float = 0.0
-    color_phase: float = 0.0
-    palette_phase: float = 0.0
 
 
 sock = None
 energy_history = deque(maxlen=ENERGY_HISTORY)
-audio_state = AudioState(
-    motion_phase=random.random() * 2.0 * math.pi,
-    color_phase=random.random() * 2.0 * math.pi,
-    palette_phase=random.random() * 2.0 * math.pi,
-)
+audio_state = AudioState()
 last_beat_time = None
 last_callback_time = None
-input_floor = 0.0
-input_peak = 0.0
 
 
 def set_rate(sample_rate_hz):
@@ -204,23 +169,6 @@ def debug_bar(value, width=12):
     return ("#" * int(clamp01(value) * width)).ljust(width)
 
 
-def hue_mix(hues, weights):
-    x = 0.0
-    y = 0.0
-    for hue, weight in zip(hues, weights):
-        angle = 2.0 * math.pi * hue
-        x += weight * math.cos(angle)
-        y += weight * math.sin(angle)
-    if x == 0.0 and y == 0.0:
-        return 0.0
-    return (math.atan2(y, x) / (2.0 * math.pi)) % 1.0
-
-
-def hsv_rgb(hue, sat, val):
-    red, green, blue = colorsys.hsv_to_rgb(hue % 1.0, clamp01(sat), clamp01(val))
-    return (255.0 * red, 255.0 * green, 255.0 * blue)
-
-
 def mix_audio_samples(indata):
     audio_samples = indata.mean(axis=1)
     if np.abs(audio_samples).max() > 2.0:
@@ -236,39 +184,12 @@ def generic_shape_extra(shape_extra):
     return clamp01((shape_extra - GENERIC_SHAPE_EXTRA_MIN) / GENERIC_SHAPE_EXTRA_SPAN)
 
 
-def normalize_loudness(raw_loudness):
-    global input_floor, input_peak
-
-    if input_floor == 0.0:
-        input_floor = raw_loudness * INPUT_FLOOR_BOOTSTRAP
-    else:
-        alpha = INPUT_FLOOR_ATTACK if raw_loudness < input_floor else INPUT_FLOOR_RELEASE
-        input_floor += alpha * (raw_loudness - input_floor)
-
-    if input_peak == 0.0:
-        input_peak = max(raw_loudness, input_floor * INPUT_PEAK_BOOTSTRAP)
-    else:
-        alpha = INPUT_PEAK_ATTACK if raw_loudness > input_peak else INPUT_PEAK_RELEASE
-        input_peak += alpha * (raw_loudness - input_peak)
-        input_peak = max(input_peak, input_floor + MIN_SIGNAL_RANGE)
-
-    signal_range = max(input_peak - input_floor, MIN_SIGNAL_RANGE)
-    normalized_level = clamp01((raw_loudness - input_floor) / signal_range)
-    signal_present = raw_loudness > max(
-        MIN_SIGNAL_LEVEL,
-        input_floor + SIGNAL_PRESENT_FRACTION * signal_range,
-    )
-
-    return normalized_level, signal_present
-
-
 def extract_audio_features(audio_samples):
     fft_mag = np.abs(np.fft.rfft(audio_samples))
     total = float(np.sum(fft_mag))
-    raw_loudness = float(np.sqrt(np.mean(audio_samples ** 2)))
-    loudness, signal_present = normalize_loudness(raw_loudness)
+    loudness = clamp01(np.sqrt(np.mean(audio_samples ** 2)))
 
-    if total < 1e-6 or not signal_present:
+    if total < SILENCE_GATE:
         energy_history.clear()
         return AudioFeatures(), 0.0
 
@@ -283,7 +204,7 @@ def extract_audio_features(audio_samples):
 
     frame_energy = float(np.mean(fft_mag ** 2))
     average_energy = frame_energy if not energy_history else float(np.mean(energy_history))
-    beat_trigger = 1.0 if loudness >= MIN_BEAT_LEVEL and frame_energy > BEAT_THRESHOLD * average_energy else 0.0
+    beat_trigger = 1.0 if frame_energy > BEAT_THRESHOLD * average_energy else 0.0
     energy_history.append(frame_energy)
 
     return features, beat_trigger
@@ -322,69 +243,13 @@ def update_audio_state(features, beat_trigger):
     if beat_onset:
         audio_state.beat_pulse = 1.0
     else:
-        pulse_speed = clamp01(
-            0.65 * audio_state.tempo +
-            0.20 * audio_state.treble +
-            0.15 * audio_state.level
-        )
-        beat_decay = BEAT_DECAY_SLOW - (BEAT_DECAY_SLOW - BEAT_DECAY_FAST) * pulse_speed
+        beat_decay = BEAT_DECAY_SLOW - (BEAT_DECAY_SLOW - BEAT_DECAY_FAST) * audio_state.tempo
         audio_state.beat_pulse *= beat_decay
 
-    if audio_state.level < 0.05:
-        audio_state.beat_pulse *= 0.75
-
-    if last_beat_time is None or (now - last_beat_time) > 1.5:
-        audio_state.tempo = max(0.0, audio_state.tempo - TEMPO_IDLE_DECAY * dt)
-
-    instant_energy = clamp01(
-        0.40 * audio_state.level +
-        0.25 * audio_state.bass +
-        0.20 * audio_state.tempo +
-        0.15 * audio_state.beat_pulse
+    motion_hz = MIN_MOTION_HZ + (MAX_MOTION_HZ - MIN_MOTION_HZ) * (
+        0.75 * audio_state.tempo + 0.25 * audio_state.level
     )
-    instant_brightness = clamp01(
-        0.60 * audio_state.spectral +
-        0.40 * audio_state.treble
-    )
-    instant_noise = clamp01(
-        0.60 * audio_state.noise +
-        0.20 * audio_state.bass +
-        0.20 * audio_state.tempo
-    )
-
-    audio_state.mood_energy = smooth_follow(
-        audio_state.mood_energy, instant_energy, MOOD_ATTACK, MOOD_RELEASE
-    )
-    audio_state.mood_brightness = smooth_follow(
-        audio_state.mood_brightness, instant_brightness, MOOD_ATTACK, MOOD_RELEASE
-    )
-    audio_state.mood_noise = smooth_follow(
-        audio_state.mood_noise, instant_noise, MOOD_ATTACK, MOOD_RELEASE
-    )
-
-    motion_drive = clamp01(
-        0.70 * audio_state.tempo +
-        0.20 * audio_state.treble +
-        0.10 * audio_state.level
-    )
-    motion_hz = MIN_MOTION_HZ + (MAX_MOTION_HZ - MIN_MOTION_HZ) * motion_drive
     audio_state.motion_phase = (audio_state.motion_phase + (2.0 * math.pi * motion_hz * dt)) % (2.0 * math.pi)
-
-    color_drive = clamp01(
-        0.45 * audio_state.tempo +
-        0.30 * audio_state.mood_brightness +
-        0.25 * (1.0 - audio_state.mood_noise)
-    )
-    color_hz = COLOR_PHASE_MIN_HZ + (COLOR_PHASE_MAX_HZ - COLOR_PHASE_MIN_HZ) * color_drive
-    audio_state.color_phase = (audio_state.color_phase + (2.0 * math.pi * color_hz * dt)) % (2.0 * math.pi)
-
-    palette_drive = clamp01(
-        0.45 * audio_state.mood_energy +
-        0.30 * audio_state.tempo +
-        0.25 * audio_state.mood_brightness
-    )
-    palette_hz = PALETTE_CYCLE_MIN_HZ + (PALETTE_CYCLE_MAX_HZ - PALETTE_CYCLE_MIN_HZ) * palette_drive
-    audio_state.palette_phase = (audio_state.palette_phase + (2.0 * math.pi * palette_hz * dt)) % (2.0 * math.pi)
 
 
 def build_scene_values():
@@ -406,114 +271,52 @@ def build_scene_values():
     shape_size = SHAPE_SIZE_MIN + (SHAPE_SIZE_MAX - SHAPE_SIZE_MIN) * shape_size_mix
     shape_extra = SHAPE_EXTRA_MIN + (SHAPE_EXTRA_MAX - SHAPE_EXTRA_MIN) * shape_extra_mix
 
-    instant_energy = clamp01(
-        0.40 * audio_state.level +
-        0.25 * audio_state.bass +
-        0.20 * audio_state.tempo +
-        0.15 * audio_state.beat_pulse
+    mood_heat = clamp01(
+        0.65 * audio_state.bass +
+        0.40 * audio_state.noise +
+        0.30 * audio_state.level +
+        0.30 * audio_state.tempo -
+        0.15 * audio_state.spectral
     )
-    section_lift = clamp01(
-        0.5 +
-        1.6 * (instant_energy - audio_state.mood_energy) +
-        0.8 * (audio_state.spectral - audio_state.mood_brightness)
+    mood_cool = clamp01(
+        0.55 * audio_state.spectral +
+        0.25 * audio_state.mid +
+        0.25 * (1.0 - audio_state.noise) +
+        0.25 * (1.0 - audio_state.tempo)
     )
-    music_energy = clamp01(
-        0.72 * audio_state.mood_energy +
-        0.18 * audio_state.beat_pulse +
-        0.10 * audio_state.tempo
+    mood_mix = clamp01(0.5 + 1.10 * (mood_heat - mood_cool))
+    mood_aggression = clamp01(
+        0.50 * audio_state.bass +
+        0.35 * audio_state.noise +
+        0.30 * audio_state.tempo +
+        0.25 * audio_state.beat_pulse
     )
-    music_liveliness = clamp01(
-        0.55 * audio_state.tempo +
-        0.20 * audio_state.treble +
-        0.15 * audio_state.beat_pulse +
-        0.10 * section_lift
+    mood_brightness = clamp01(
+        0.45 * audio_state.level +
+        0.30 * audio_state.spectral +
+        0.25 * audio_state.beat_pulse
     )
-    cool_bias = clamp01(
-        (1.0 - music_energy) * (0.45 + 0.55 * audio_state.mood_brightness)
-    )
-    mystic_bias = clamp01(
-        (1.0 - music_energy) * (0.15 + 0.85 * audio_state.mood_brightness)
-    )
-    warm_bias = clamp01(
-        music_energy * (0.35 + 0.65 * audio_state.bass)
-    )
-    aggression = clamp01(
-        music_energy * (
-            0.30 * audio_state.mood_noise +
-            0.35 * audio_state.bass +
-            0.35 * audio_state.tempo
-        )
-    )
-    palette_brightness = clamp01(
-        0.12 +
-        0.28 * audio_state.mood_energy +
-        0.20 * audio_state.mood_brightness +
-        0.28 * audio_state.beat_pulse +
-        0.12 * section_lift
-    )
-    shade_wave = 0.5 + 0.5 * math.sin(audio_state.color_phase)
-    shade_wave_offset = 0.5 + 0.5 * math.sin(audio_state.color_phase + 2.1)
-    base_hue = (audio_state.palette_phase / (2.0 * math.pi)) % 1.0
-    cool_hue = (0.58 + 0.06 * math.sin(audio_state.palette_phase * 0.37 + 0.9)) % 1.0
-    mystic_hue = (0.78 + 0.05 * math.sin(audio_state.palette_phase * 0.29 + 1.6)) % 1.0
-    warm_hue = (0.03 + 0.04 * math.sin(audio_state.palette_phase * 0.41 + 0.3)) % 1.0
 
-    palette_hue = hue_mix(
-        (base_hue, cool_hue, mystic_hue, warm_hue),
-        (
-            1.0,
-            0.75 * cool_bias,
-            0.70 * mystic_bias,
-            0.85 * warm_bias + 0.55 * aggression,
-        ),
-    )
-    bg_hue = (palette_hue + 0.03 * (shade_wave - 0.5) + 0.02 * (section_lift - 0.5)) % 1.0
-    shape_hue = (palette_hue + 0.05 + 0.04 * (shade_wave_offset - 0.5)) % 1.0
-
-    bg_sat = clamp01(
-        0.22 +
-        0.18 * palette_brightness +
-        0.20 * music_energy +
-        0.12 * section_lift
-    )
-    shape_sat = clamp01(
-        0.32 +
-        0.20 * palette_brightness +
-        0.22 * music_liveliness +
-        0.10 * aggression
-    )
-    bg_base = hsv_rgb(
-        bg_hue,
-        bg_sat,
-        0.05 + 0.14 * palette_brightness + 0.06 * shade_wave,
-    )
-    bg_flash = hsv_rgb(
-        bg_hue,
-        clamp01(bg_sat + 0.10 + 0.10 * shade_wave_offset),
-        0.10 + 0.22 * section_lift + 0.48 * audio_state.beat_pulse,
-    )
-    bg_ambient = blend_rgb(BG_GLOOM, bg_base, 0.16 + 0.34 * palette_brightness)
+    bg_base = blend_rgb(BG_COOL, BG_WARM, mood_mix)
+    bg_base = blend_rgb(bg_base, BG_HELL, mood_aggression)
+    bg_ambient = blend_rgb(BG_GLOOM, bg_base, 0.12 + 0.18 * mood_brightness + 0.12 * audio_state.spectral)
+    bg_flash = blend_rgb(FLASH_COOL, FLASH_WARM, mood_mix)
+    bg_flash = blend_rgb(bg_flash, FLASH_HELL, mood_aggression)
     bg_rgb = rgb_u32(
         *add_rgb(
             scale_rgb(bg_ambient, 1.0),
-            scale_rgb(bg_flash, 0.08 + 0.42 * section_lift + 0.55 * audio_state.beat_pulse),
+            scale_rgb(bg_flash, 0.25 * audio_state.level + 0.90 * audio_state.beat_pulse),
         )
     )
 
-    shape_base = hsv_rgb(
-        shape_hue,
-        shape_sat,
-        0.26 + 0.24 * palette_brightness + 0.12 * shade_wave,
-    )
-    shape_highlight = hsv_rgb(
-        shape_hue,
-        clamp01(shape_sat + 0.08 + 0.12 * shade_wave_offset),
-        0.36 + 0.28 * music_liveliness + 0.30 * audio_state.beat_pulse + 0.12 * section_lift,
-    )
+    shape_base = blend_rgb(SHAPE_COOL, SHAPE_WARM, mood_mix)
+    shape_base = blend_rgb(shape_base, SHAPE_HELL, mood_aggression)
+    shape_highlight = blend_rgb(SHAPE_COOL_HI, SHAPE_WARM_HI, mood_mix)
+    shape_highlight = blend_rgb(shape_highlight, SHAPE_HELL_HI, mood_aggression)
     shape_rgb = rgb_u32(
         *add_rgb(
-            scale_rgb(shape_base, 0.24 + 0.32 * palette_brightness + 0.12 * shade_wave),
-            scale_rgb(shape_highlight, 0.16 + 0.52 * audio_state.beat_pulse + 0.22 * music_liveliness + 0.14 * section_lift),
+            scale_rgb(shape_base, 0.35 + 0.35 * audio_state.level + 0.20 * audio_state.spectral),
+            scale_rgb(shape_highlight, 0.25 + 0.55 * audio_state.beat_pulse + 0.20 * audio_state.tempo),
         )
     )
 

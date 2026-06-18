@@ -10,7 +10,10 @@ module palette (
 );
 
     logic [7:0] iter_d1;
+    logic [7:0] iter_d2;
     logic [23:0] palette_rom [0:255];
+    logic [23:0] palette_rgb_d1;
+    logic [23:0] shape_rgb_d1;
     logic [23:0] tinted_rgb;
     integer idx;
 
@@ -59,13 +62,21 @@ module palette (
     always_ff @(posedge clk) begin
         if (!rst_n) begin
             iter_d1 <= 8'd0;
+            iter_d2 <= 8'd0;
+            palette_rgb_d1 <= 24'd0;
+            shape_rgb_d1 <= 24'd0;
             tinted_rgb <= 24'd0;
-            rgb <= 24'd0;
         end else begin
             iter_d1 <= iter;
-            tinted_rgb <= tint_rgb(palette_rom[iter], shape_rgb);
-            rgb <= (iter_d1 >= 8'd128) ? bg_rgb : tinted_rgb;
+            iter_d2 <= iter_d1;
+            palette_rgb_d1 <= palette_rom[iter];
+            shape_rgb_d1 <= shape_rgb;
+            tinted_rgb <= tint_rgb(palette_rgb_d1, shape_rgb_d1);
         end
+    end
+
+    always_comb begin
+        rgb = (iter_d2 >= 8'd128) ? bg_rgb : tinted_rgb;
     end
 
 endmodule

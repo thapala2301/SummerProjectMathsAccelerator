@@ -244,8 +244,8 @@
             slv_reg13 <= 32'h00000000;
             slv_reg14 <= 32'h02090000; // cell_sz
             slv_reg15 <= 32'h02050000; // half_cell
-            slv_reg16 <= 32'h02050000; // shape_size
-            slv_reg17 <= 32'h01F0CCCD; // shape_extra
+            slv_reg16 <= 32'h01FC0000; // shape_size
+            slv_reg17 <= 32'h01F345D1; // shape_extra
             slv_reg18 <= 32'h00000000; // bg_rgb
             slv_reg19 <= 32'h00FFFFFF; // shape_rgb
             slv_reg20 <= 32'h00000000; // beat_pulse
