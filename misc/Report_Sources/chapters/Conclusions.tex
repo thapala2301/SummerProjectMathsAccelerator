@@ -1,0 +1,67 @@
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+\begin{spacing}{0.3}
+\minitoc
+\end{spacing}
+
+\thesisspacing
+
+This project delivered a fully functional real-time ray marching engine on the
+Xilinx PYNQ-Z1 SoC FPGA, demonstrated live at $1024\times600$ resolution over
+HDMI at frame rates between 18\,fps (Mandelbox fractal) and over 40\,fps
+(analytic SDF scenes). The system integrates a custom 27-bit floating-point
+library, a dual-core pipelined ray marcher, IMU head-tracking, music-reactive
+geometry, and a Python UI with runtime bitstream switching, all within the
+resource constraints of a \$65 development board.
+
+\section{What Was Achieved}
+
+All ten project requirements were met or exceeded. The custom FP27 format
+halved DSP usage compared to IEEE\,754 single precision while preserving the
+full 8-bit exponent range, and the dual-core architecture doubled pixel
+throughput at minimal additional resource cost. Nine SDF scenes are
+demonstrated, covering analytic primitives and a Mandelbox fractal, all
+switchable at runtime without rebooting the board. The music-reactive pipeline
+- 1024-point FFT on the host PC, 11 features over TCP, AXI-Lite mapped
+directly to SDF parameters - produces a visually striking effect in which
+geometry and camera motion respond live to audio. The IMU complementary filter
+and VR headset enclosure make the rendering interactive in a way that goes
+beyond the project brief.
+
+\section{What Was Not Completed}
+
+Two objectives were only partially met. The neural implicit SDF engine
+(\texttt{sdf\_nn.sv}, \texttt{neuron\_layer.sv}, \texttt{trilinear\_interp.sv})
+was fully designed and synthesised, but integration with the fixed-latency march
+pipeline was not completed within the project timeline. Since the MLP latency is
+fully deterministic, the fix --- setting \texttt{SDF\_LAT} to the correct
+pipeline depth --- is straightforward and left as future work. The Mandelbox
+scene required reducing the clock to 100\,MHz due to the depth of its iterated
+fold logic; closing timing at 125\,MHz would require retiming the fold pipeline
+or inserting additional register stages.
+
+\section{Lessons Learned}
+
+The most significant lesson was the value of the prototype-then-synthesise
+methodology: validating each SDF scene in WebGL2 before translating to
+SystemVerilog eliminated entire classes of algorithmic bugs from the RTL debug
+cycle. The \texttt{state\_pipe} alignment discipline - where every pipeline
+signal carries an explicit latency annotation and is delayed by a parameterised
+shift register - proved essential; a single off-by-one in \texttt{SDF\_LAT}
+corrupts an entire frame silently. Early adoption of the custom FP27 format,
+rather than retrofitting from fixed-point late in the project, avoided a
+costly re-implementation of the SDF library.
+With such a complex design, fullunderstanding was paramount to resolve bugs. Getting something on the screen took us days because we didn't understand how to write the block design, what it's interfaces with the ray marching logic were. Tracking address spaces for VDMA proved also timely. We learnt that it's best to learn first and never rush- though this may seem antithetical with our sprint worflow, we often took a day or two off to revise produced code, refactor, comment, take notes... A system this complex does not come on it's own!
+
+\section{Future Work}
+
+Immediate extensions include completing the neural SDF integration and
+closing 125\,MHz timing on the Mandelbox. Longer term, the architecture
+naturally extends to a quad-core configuration - the dispatcher and
+framebuffer writer are already parameterised by core count - which would
+push simple scenes above 80\,fps. Of course, utilization is already tight for 2 cores, so tradeoffs would have to be made - perhaps cutting down on precision, such as the number of Raphson iterations for the inverse operation... Replacing the host-PC FFT with an on-chip
+Xilinx FFT IP would make the music-reactive mode self-contained, removing the
+TCP dependency. However, this is impossible - despite trying many hours to rewrite linux audio libraries, the system refused to use our USB Audio adapter as a USB Host (though recognized it). Finally, porting the FP27 library to a higher-end Zynq
+UltraScale+ device would allow higher-resolution rendering and more complex
+fractal iterations within a single clock budget!

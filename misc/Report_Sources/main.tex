@@ -1,0 +1,103 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DO NOT MODIFY FROM HERE ...
+\documentclass[oneside]{ic_eee_thesis}
+\geometry{margin=1in}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{array}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{placeins}
+\usetikzlibrary{arrows.meta, automata, positioning, shapes, shapes.geometric, fit, trees, decorations.markings}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage[most]{tcolorbox}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{colormaps}
+\usepackage{hyperref}
+\usepackage{pgfgantt}
+\usepackage[style=ieee,backend=biber,hyperref=auto]{biblatex}
+\addbibresource{references.bib}
+% ... TO HERE
+
+\lstset{
+  language=Verilog,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=5pt,
+  frame=single,
+  breaklines=true,
+}
+
+%%%%%%%%%%%%%%%% SETUP %%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\degree{MEng}
+\title{Audio-Reactive FPGA Ray Marcher}
+\subtitle{EEE/EIE Group Project — 2nd Year Summer Term 2026}
+\author{
+  V. Bossard CID: 02628329 \\[1mm]
+  C. Sampson  CID: 02596094 \\[1mm]
+  T. Palakumar CID: 02556047 \\[1mm]
+  J. Kaza Venkata CID: 02564675 \\[1mm]
+  S. Balaji Perumal CID: 02556062 \\[1mm]
+  J. Cai CID: 02583740 \\[1mm]
+}
+
+\cid{00000000}
+\supervisor{Ed Stott}
+\submityear{2026}
+\course{Electrical and Electronic Engineering}
+\setboolean{list_of_figures}{false}
+\setboolean{list_of_tables}{false}
+\setboolean{acknowledgement}{true}
+\setboolean{acronyms}{false}
+\setboolean{edge_labels}{true}
+\setboolean{double_spacing}{true}
+\setboolean{final_thesis}{false}
+%%%%%%%%%%%%% END SETUP %%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\vect}{vec}
+
+\begin{document}
+\preamble
+
+% Chapter 1 — Introduction
+\input{chapters/Chapter1.tex}
+
+% Chapter 2 — System Components and Design
+\input{chapters/Chapter2.tex}
+
+% Chapter 3 — System Integration
+\input{chapters/Chapter3.tex}
+
+% Chapter 4 — Testing
+\input{chapters/Chapter4.tex}
+
+% Chapter 5 - Conclusion
+\input{chapters/Conclusions.tex}
+
+% Chapter 6 - Evaluation
+\input{chapters/Evaluation}
+
+% Appendix Environment
+\appendix
+\input{chapters/AppendixA.tex}
+
+% Bibliography Compilation
+\cleardoublepage
+\nocite{*}
+\printbibliography
+
+\end{document}

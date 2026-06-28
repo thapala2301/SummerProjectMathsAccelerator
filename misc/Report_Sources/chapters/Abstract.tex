@@ -1,0 +1,39 @@
+\begin{abstract}
+This project designs and implements a real-time ray marching engine on the
+Xilinx PYNQ-Z1 SoC FPGA, serving as the rendering backend for a Virtual
+Reality headset with live head-tracking. Ray marching was selected for its
+pixel-level independence, making it naturally suited to a parallel hardware
+implementation.
+
+The programmable logic implements a custom 27-bit floating-point library in
+SystemVerilog, covering standard arithmetic, inverse square root, division,
+and modulus, functioning analogously to a dedicated FPU. These primitives
+drive a fully pipelined SDF evaluation accelerator feeding a dual-core ray
+marching engine. Completed frames are streamed to DDR3 over AXI VDMA into a
+double-buffered framebuffer, generating a real-time HDMI display at
+$1024\times600$ at 18--40\,fps depending on scene complexity.
+
+The ARM Cortex-A9 runs a Python interface that renders a scene-selection
+overlay onto HDMI and coordinates runtime bitstream switching across nine
+scenes. An MPU-6050 IMU communicates over I\textsuperscript{2}C to track
+pitch, roll, and yaw, updating the camera lookat matrix every frame.
+
+Audio reactivity is implemented via a per-frame FFT on a host PC. Bass,
+midrange, treble energy, RMS, spectral centroid, and a beat detection flag
+are streamed over TCP to the PYNQ, where they are written directly into
+AXI-Lite SDF parameter registers; modulating spatial repetition period,
+geometry scale, and camera orbit in real time with the music.
+
+The accelerator exceeds a reference C implementation by over an order of
+magnitude, satisfying the project brief. Nine SDF scenes are demonstrated
+across analytic primitives and fractals. A neural implicit SDF inference
+engine was designed and partially implemented; full integration remains
+future work.
+
+\bigskip
+\vspace{2cm}
+\textit{Throughout the report are scattered photos of the renders we were
+able to obtain, or the renders we obtained with OpenGL GLSL shading language. As such, the reader travels with us in the beautiful world
+of ray marching, seeing our initial attempts and failures as much as our
+stunning final renders.}
+\end{abstract}

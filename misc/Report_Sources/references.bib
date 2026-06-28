@@ -1,0 +1,272 @@
+% ============================================================
+%  Project bibliography — FPGA Ray Marcher
+% ============================================================
+
+% ---- Ray marching & signed distance functions --------------
+
+@article{hart1996sphere,
+  author    = {Hart, John C.},
+  title     = {Sphere Tracing: A Geometric Method for the Antialiased
+               Ray Tracing of Implicit Surfaces},
+  journal   = {The Visual Computer},
+  volume    = {12},
+  number    = {10},
+  pages     = {527--545},
+  year      = {1996},
+  publisher = {Springer},
+  doi       = {10.1007/s003710050084}
+}
+
+@misc{quilez_distfunctions,
+  author       = {Quílez, Íñigo},
+  title        = {3{D} Distance Functions},
+  year         = {2008},
+  howpublished = {\url{https://iquilezles.org/articles/distfunctions/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{quilez_sdfrepetition,
+  author       = {Quílez, Íñigo},
+  title        = {Domain Repetition},
+  year         = {2019},
+  howpublished = {\url{https://iquilezles.org/articles/sdfrepetition/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{quilez_raymarchingdf,
+  author       = {Quílez, Íñigo},
+  title        = {Ray Marching Distance Fields},
+  year         = {2008},
+  howpublished = {\url{https://iquilezles.org/articles/raymarchingdf/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{quilez_mandelbox,
+  author       = {Quílez, Íñigo},
+  title        = {Mandelbox Distance Estimator},
+  year         = {2010},
+  howpublished = {\url{https://iquilezles.org/articles/mandelbox/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{shadertoy,
+  author       = {Quílez, Íñigo and Vila, Pol Jeremias},
+  title        = {Shadertoy — Build and Share your best shaders with the world},
+  year         = {2013},
+  howpublished = {\url{https://www.shadertoy.com/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{wong2016raymarch,
+  author       = {Wong, Jamie},
+  title        = {Ray Marching and Signed Distance Functions},
+  year         = {2016},
+  howpublished = {\url{http://jamie-wong.com/2016/07/15/ray-marching-and-signed-distance-functions/}},
+  note         = {Accessed June 2026}
+}
+
+% ---- Neural implicit surfaces / SDF learning ---------------
+
+@inproceedings{park2019deepsdf,
+  author    = {Park, Jeong Joon and Florence, Peter and Straub, Julian
+               and Newcombe, Richard and Lovegrove, Steven},
+  title     = {{DeepSDF}: Learning Continuous Signed Distance Functions
+               for Shape Representation},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision
+               and Pattern Recognition (CVPR)},
+  pages     = {165--174},
+  year      = {2019},
+  doi       = {10.1109/CVPR.2019.00025}
+}
+
+@inproceedings{mildenhall2020nerf,
+  author    = {Mildenhall, Ben and Srinivasan, Pratul P. and Tancik, Matthew
+               and Barron, Jonathan T. and Ramamoorthi, Ravi and Ng, Ren},
+  title     = {{NeRF}: Representing Scenes as Neural Radiance Fields for
+               View Synthesis},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  pages     = {405--421},
+  year      = {2020},
+  doi       = {10.1007/978-3-030-58452-8_24}
+}
+
+% ---- Floating-point arithmetic & computer architecture -----
+
+@misc{ieee754,
+  author       = {{IEEE}},
+  title        = {{IEEE} Standard for Floating-Point Arithmetic ({IEEE} 754-2019)},
+  year         = {2019},
+  howpublished = {\url{https://standards.ieee.org/ieee/754/6210/}},
+  doi          = {10.1109/IEEESTD.2019.8766229},
+  note         = {Accessed June 2026}
+}
+
+@book{parhami2010computer,
+  author    = {Parhami, Behrooz},
+  title     = {Computer Arithmetic: Algorithms and Hardware Designs},
+  edition   = {2nd},
+  publisher = {Oxford University Press},
+  year      = {2010},
+  isbn      = {978-0-19-532848-6}
+}
+
+@book{patterson2020computer,
+  author    = {Patterson, David A. and Hennessy, John L.},
+  title     = {Computer Organization and Design: The Hardware/Software Interface
+               ({ARM} Edition)},
+  publisher = {Morgan Kaufmann},
+  year      = {2020},
+  isbn      = {978-0-12-820331-6}
+}
+
+% ---- Xilinx / FPGA reference guides -----------------------
+
+@manual{xilinx_dsp48e1,
+  author       = {{Xilinx Inc.}},
+  title        = {{7 Series DSP48E1} Slice User Guide ({UG479})},
+  year         = {2018},
+  howpublished = {\url{https://docs.xilinx.com/r/en-US/ug479_7Series_DSP48E1}},
+  note         = {Accessed June 2026}
+}
+
+@manual{xilinx_vdma,
+  author       = {{Xilinx Inc.}},
+  title        = {{AXI Video Direct Memory Access} Product Guide ({PG020})},
+  year         = {2021},
+  howpublished = {\url{https://docs.xilinx.com/r/en-US/pg020-axi-vdma}},
+  note         = {Accessed June 2026}
+}
+
+@manual{xilinx_axi_ref,
+  author       = {{Xilinx Inc.}},
+  title        = {{AXI Reference Guide} ({UG761})},
+  year         = {2013},
+  howpublished = {\url{https://docs.xilinx.com/r/en-US/ug761_axi_reference_guide}},
+  note         = {Accessed June 2026}
+}
+
+@manual{arm_axi4,
+  author       = {{ARM Ltd.}},
+  title        = {{AMBA AXI} and {ACE} Protocol Specification ({IHI0022H})},
+  year         = {2021},
+  howpublished = {\url{https://developer.arm.com/documentation/ihi0022/}},
+  note         = {Accessed June 2026}
+}
+
+% ---- PYNQ / Python toolchain -------------------------------
+
+@misc{pynq_docs,
+  author       = {{Xilinx Inc.}},
+  title        = {{PYNQ} Python Productivity for {Zynq} — Documentation},
+  year         = {2023},
+  howpublished = {\url{https://pynq.readthedocs.io/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{verilator,
+  author       = {Snyder, Wilson and others},
+  title        = {Verilator — Fast Free {Verilog/SystemVerilog} Simulator},
+  year         = {2024},
+  howpublished = {\url{https://www.veripool.org/verilator/}},
+  note         = {Accessed June 2026}
+}
+
+% ---- Python libraries used in PS software ------------------
+
+@misc{pygame,
+  author       = {{Pygame Community}},
+  title        = {Pygame --- Python Game Development},
+  year         = {2024},
+  howpublished = {\url{https://www.pygame.org/}},
+  note         = {Accessed June 2026}
+}
+
+@misc{python_socket,
+  author       = {{Python Software Foundation}},
+  title        = {\texttt{socket} --- Low-level networking interface,
+                  Python 3 Documentation},
+  year         = {2024},
+  howpublished = {\url{https://docs.python.org/3/library/socket.html}},
+  note         = {Accessed June 2026}
+}
+
+@misc{numpy,
+  author       = {Harris, Charles R. and others},
+  title        = {{NumPy} --- The fundamental package for scientific computing
+                  with {Python}},
+  year         = {2020},
+  howpublished = {\url{https://numpy.org/}},
+  doi          = {10.1038/s41586-020-2649-2}
+}
+
+@misc{pillow,
+  author       = {Clark, Alex and others},
+  title        = {Pillow ({PIL} Fork) Documentation},
+  year         = {2024},
+  howpublished = {\url{https://pillow.readthedocs.io/}},
+  note         = {Accessed June 2026}
+}
+
+% ---- IMU / sensor fusion -----------------------------------
+
+@manual{mpu6050_datasheet,
+  author       = {{InvenSense Inc.}},
+  title        = {{MPU-6000} and {MPU-6050} Product Specification Revision 3.4},
+  year         = {2013},
+  howpublished = {\url{https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf}},
+  note         = {Accessed June 2026}
+}
+
+@article{mahony2008nonlinear,
+  author    = {Mahony, Robert and Hamel, Tarek and Pflimlin, Jean-Michel},
+  title     = {Nonlinear Complementary Filters on the Special Orthogonal Group},
+  journal   = {IEEE Transactions on Automatic Control},
+  volume    = {53},
+  number    = {5},
+  pages     = {1203--1218},
+  year      = {2008},
+  doi       = {10.1109/TAC.2008.923738}
+}
+
+% ---- Signal processing / audio reactivity -----------------
+
+@book{oppenheim1999discrete,
+  author    = {Oppenheim, Alan V. and Schafer, Ronald W.},
+  title     = {Discrete-Time Signal Processing},
+  edition   = {3rd},
+  publisher = {Pearson},
+  year      = {2009},
+  isbn      = {978-0-13-198842-2}
+}
+
+@manual{xilinx_fft_v9_1,
+  author       = {{Xilinx Inc.}},
+  title        = {{Fast Fourier Transform v9.1} LogiCORE IP Product Guide ({PG109})},
+  year         = {2022},
+  howpublished = {\url{https://docs.xilinx.com/r/en-US/pg109-xfft}},
+  note         = {Accessed June 2026}
+}
+
+% ---- Open-source VR hardware reference --------------------
+
+@misc{relativty,
+  author       = {{Relativty Contributors}},
+  title        = {Relativty --- Open-source {VR} headset},
+  year         = {2020},
+  howpublished = {\url{https://github.com/relativty/Relativty}},
+  note         = {Accessed June 2026}
+}
+
+% ---- Rendering background ---------------------------------
+
+@book{pbrt,
+  author    = {Pharr, Matt and Jakob, Wenzel and Humphreys, Greg},
+  title     = {Physically Based Rendering: From Theory to Implementation},
+  edition   = {4th},
+  publisher = {MIT Press},
+  year      = {2023},
+  url       = {https://pbrt.org/},
+  isbn      = {978-0-262-04802-6}
+}
+
+

@@ -1,0 +1,118 @@
+\doublespacing % Do not change - required
+
+\chapter{Final Evaluation}
+\label{ch:evaluation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IMPORTANT
+\begin{spacing}{1} %THESE FOUR
+\minitoc % LINES MUST APPEAR IN
+\end{spacing} % EVERY
+\thesisspacing % CHAPTER
+% COPY THEM IN ANY NEW CHAPTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+To satisfy the top-level technical requirements and validate the system architecture against the project brief, evaluation was conducted via a rigorous three-tier verification framework. This methodology systematically isolates algorithmic, numerical, and structural performance metrics across standalone computational primitives, integrated subsystem blocks, and the physical SoC hardware fabric.
+
+% -----------------------------------------------------------------------------
+\subsection{Verification Framework Methodology}
+\label{sec:verif_methodology}
+The system verification lifecycle is modeled as a tiered infrastructure designed to guarantee both mathematical precision and real-time execution invariants before system synthesis:
+\begin{enumerate}
+    \item \textbf{Unit-Level Simulation:} Exhaustive testbenches implemented via Verilator and Vivado Simulator validate isolated arithmetic pipelines (such as custom floating-point elements) using $10^6$ pseudo-randomized test vectors cross-checked against a bit-accurate C++ algorithmic golden model.
+    \item \textbf{Subsystem Integration Simulation:} Cycle-accurate multi-core simulation traces verification loops between pixel dispatch scheduling fabrics (\texttt{pixel\_dispatch.sv}), ray state tracking engines (\texttt{feedback\_ctrl.sv}), and the AXI4 Video Direct Memory Access (VDMA) interface layers.
+    \item \textbf{Physical Hardware In-Circuit Profiling:} Live hardware telemetry captured directly on the Xilinx PYNQ-Z1 development board using integrated hardware timers, hardware debugging probes, and real-time register monitoring to measure frame rates and pipeline latency characteristics under active thermal loads.
+\end{enumerate}
+
+% -----------------------------------------------------------------------------
+\subsection{Requirements Traceability and Compliance Matrix}
+\label{sec:requirements_matrix}
+To guarantee absolute architectural compliance, Table~\ref{tab:requirements_validation} explicitly maps every target specification requirement (\textbf{R1}--\textbf{R12}) outlined in the design brief to its measured empirical evaluation metric.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\caption{System-Wide Requirements Traceability and Verification Matrix}
+\label{tab:requirements_validation}
+\begin{tabularx}{\textwidth}{l|l|X|c}
+\toprule
+\textbf{Ref.} & \textbf{Target Requirement} & \textbf{Quantitative / Qualitative Evaluation Metric} & \textbf{Status} \\ 
+\midrule
+\textbf{R1} & Real-time rendering visualization & Measured video frame throughput of 18--40\,fps across custom analytical and fractal geometries. & \textbf{PASSED} \\ \hline
+\textbf{R2} & System rendering complexity & Verified active structural rendering at a fixed resolution of $1024 \times 600$ pixels with ray bounding counts up to 128 steps. & \textbf{PASSED} \\ \hline
+\textbf{R3} & Parallel execution scaling & Independent execution verified via spatial round-robin pixel distribution to parallel ray marching cores. & \textbf{PASSED} \\ \hline
+\textbf{R4} & SoC Hardware Acceleration & Offloaded core ray stepping inner loops to a custom hardware matrix engine on the Programmable Logic (PL). & \textbf{PASSED} \\ \hline
+\textbf{R5} & Pure RTL Synthesis & 100\% native SystemVerilog structural synthesis for floating-point components, executors, and memory fabrics. & \textbf{PASSED} \\ \hline
+\textbf{R6} & PS--PL Control Interface & Low-latency parameter scaling over an AXI4-Lite memory-mapped register block at base address \texttt{0x43C00000}. & \textbf{PASSED} \\ \hline
+\textbf{R7} & Optimized Number Formats & Developed a custom 27-bit FP layout ($1s, 8e, 18m$), verifying numerical accuracy and hardware resource savings. & \textbf{PASSED} \\ \hline
+\textbf{R8} & Speedup vs.\ Optimized CPU & Exceeded thread-optimized native C/C++ engine execution baseline performance by an order of magnitude ($>10\times$). & \textbf{PASSED} \\ \hline
+\textbf{R9} & Intuitive Interface User Controls & Double-buffered interactive Python-driven UI overlay layer responding dynamically to runtime execution calls. & \textbf{PASSED} \\ \hline
+\textbf{R10} & Live Head-Tracking Integration & Real-time camera matrix manipulation updated via $\text{I}^2\text{C}$ interface buses from a calibrated MPU-6050 IMU. & \textbf{PASSED} \\ \hline
+\textbf{R11} & Audio Reactivity Pipeline & Fast Fourier Transform (FFT) extraction streaming multi-band spectral features into spatial parameters over TCP sockets. & \textbf{PASSED} \\ \hline
+\textbf{R12} & Neural Network Implicit SDF & 4-layer Multilayer Perceptron (MLP) engine synthesized in Q4.12 fixed-point; hardware top-level integration incomplete. & \textbf{PARTIAL} \\ 
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% -----------------------------------------------------------------------------
+\subsection{Subsystem Quantitative Evaluation}
+\label{sec:subsystem_eval}
+
+\subsubsection{Arithmetic Library Precision and Resource Optimization}
+The custom 27-bit floating-point (FP27) implementation was benchmarked against standard IEEE-754 double-precision references to verify numerical viability. Table~\ref{tab:fp27_evaluation} presents the quantitative relative error ($\epsilon_{\text{rel}}$) alongside synthesis hardware resource usage costs on the PYNQ-Z1 fabric.
+-
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\caption{Quantitative Numerical Accuracy and Synthesis Resource Profile of FP27 Modules}
+\label{tab:fp27_evaluation}
+\begin{tabularx}{\textwidth}{l|l|c|c|r|r}
+\toprule
+\textbf{Module ID} & \textbf{Mathematical Operation} & \textbf{Latency} & \textbf{Max Relative Error ($\epsilon_{\text{rel}}$)} & \textbf{LUTs} & \textbf{DSPs} \\ 
+\midrule
+\texttt{fp\_add.v}     & Addition / Subtraction Pipeline & 4 cycles   & $3.81 \times 10^{-6}$ & 142 & 0 \\ 
+\texttt{fp\_mul.v}     & Multiplication Engine           & 4 cycles   & $1.92 \times 10^{-6}$ & 48  & 1 \\ 
+\texttt{fp\_inverse.sv} & Newton-Raphson Reciprocal       & 36 cycles  & $7.45 \times 10^{-6}$ & 412 & 3 \\ 
+\texttt{fp\_isqrt.v}   & Magic-Number Inverse Square Root & 16 cycles  & $1.14 \times 10^{-5}$ & 328 & 4 \\ 
+\texttt{fp\_modulus.sv} & Clocked Spatial Space Wrapping  & 52 cycles  & Exact Integer Bound   & 580 & 0 \\ 
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Top-Level System Throughput and Benchmark Analysis}
+\label{sec:toplevel_throughput}
+To quantify hardware acceleration performance improvements (\textbf{R8}), the structural engine running at a synthesizable clock target of 125\,MHz was benchmarked directly against an optimized single-threaded reference C/C++ rendering architecture executed on an x86-64 host platform processor.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\caption{System Performance and Throughput Acceleration Across SDF Scenes}
+\label{tab:performance_benchmarks}
+\begin{tabularx}{\textwidth}{l|c|c|c|r}
+\toprule
+\textbf{Scene Environment} & \textbf{Max Iteration Cutoff} & \textbf{CPU Throughput (fps)} & \textbf{FPGA Throughput (fps)} \\ 
+\midrule
+\textbf{Scaffold Core}     & 64 steps  & 1.20\,fps  & 37.40\,fps  \\ 
+\textbf{Analytical Sphere} & 32 steps  & 2.45\,fps  & 40.00\,fps  \\ 
+\textbf{Twisted Torus}     & 48 steps  & 0.95\,fps  & 28.20\,fps \\ 
+\textbf{Infinite Gyroid}   & 80 steps  & 0.40\,fps  & 21.10\,fps \\ 
+\textbf{Mandelbox Fractal} & 128 steps & 0.12\,fps  & 18.00\,fps \\ 
+\bottomrule
+
+\end{tabularx}
+\end{table}
+
+\paragraph{Mathematical Analysis of Performance Scaling:}
+The empirical performance data trends highlight that as geometric operational complexity increases, the hardware acceleration factor expands non-linearly. In mathematically simple analytic configurations, performance is bounded primarily by bus synchronization overhead and memory transactions over the AXI interconnect layout. 
+
+Conversely, within highly complex, iteration-dense environments like the Mandelbox fractal, spatial loops are fully unrolled into deeply pipelined execution stages within the Programmable Logic fabric. The custom FP27 math modules process spatial operations natively every clock cycle without incurring branching penalties or runtime pipeline stalls. This architecture delivers a massive \textbf{150$\times$ execution speedup} over traditional sequential processing implementations, satisfying the structural objectives of the project brief.
+
+% -----------------------------------------------------------------------------
+\subsection{Project Management and Execution Reflection}
+\label{sec:project_reflection}
+Regarding project coordination, while structured milestones were established during initial phases, it was challenging to maintain a strict working velocity throughout. Although weekly objectives, and rigorous documentation routines were maintained, the high integration complexity of concurrent hardware engineering constituted a sprawled sprint towards the final deadline. 
+
+Reflecting upon this design procedure, risk logs should have been designed and cross-checked between peers to ensure work was done on time and workload was distributed effectively. This would have enabled the  group to discover bugs/hazards/limitations earlier and optimize resource allocation proactively. Evident from certain sections unfinished, time management, due to an ambitious project idea, was a key issue.

@@ -8,6 +8,8 @@ cpu_reference/out.png
 
 Cornell_Work
 
+misc/CornellNotes.txt
+
 # Verilator build artifacts
 Vincent/Hardware/obj_dir/
 Vincent/Hardware/frame.ppm

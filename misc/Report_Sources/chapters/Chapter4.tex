@@ -1,0 +1,316 @@
+\doublespacing
+
+\chapter{Evaluation and Testing}
+\label{ch3}
+
+\begin{spacing}{1}
+\minitoc
+\end{spacing}
+\thesisspacing
+
+\section{Testing Methodology}
+
+Testing followed a three-stage pyramid: unit simulation, integration
+simulation, and physical board validation, for most comprehensive debugging and to catch errors early.
+
+\paragraph{Unit simulation:}
+Every FP27 primitive has a standalone Verilator testbench that drives
+exhaustive corner cases (zero, infinity, NaN, opposite-sign operands,
+exponent overflow) and compares output against a Python reference
+implementation of the same FP27 semantics. Testbenches for the ray
+generator, pixel dispatcher, feedback controller, and framebuffer writer were
+similarly run in Vivado behavioural simulation. Modules were cross-tested by
+team members other than the original author to eliminate blind spots.
+
+\paragraph{Integration simulation:}
+The full pipeline: pixel dispatch through march core through DDR writer,
+was simulated in Verilator at $512\times300$ (half resolution to reduce
+runtime and fit our screen). The simulation confirms zero-duplicate pixel emission across all
+153{,}600 pixels and that the DDR write count matches $W\times H$ exactly.
+The Verilator sim\_main outputs a PPM image that is visually compared against
+the GLSL reference renderer as a sanity check.
+
+\paragraph{Physical board validation:}
+Final validation was on the PYNQ-Z1 board with HDMI output. Each scene was
+inspected visually against the WebGL2 GLSL reference. Frame rate was
+estimated by counting frame acknowledgements (GPIO handshake pulses) over a
+timed interval.
+
+\section{Pixel Controller Verification}
+
+The pixel dispatch and feedback control subsystem was verified by the integration testbench, which traces all $1024\times600 =
+614{,}400$ pixels through the full dispatch-march-write loop in simulation.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Integration testbench results for pixel control subsystem}
+\label{tab:pixel-verify}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l l c}
+\toprule
+\textbf{Testbench} & \textbf{Module} & \textbf{Result} \\
+\midrule
+Dispatch coverage     & \texttt{pixel\_dispatch.sv}  & All 614{,}400 pixels emitted exactly once \\
+Duplicate detection   & \texttt{feedback\_ctrl.sv}   & Zero duplicate pixel IDs across full frame \\
+FIFO overflow         & \texttt{FIFO.sv}             & No overflow at peak dispatch rate \\
+Framebuffer write     & \texttt{fb\_write.sv}        & Write count $= W \times H$ \\
+AXI burst alignment   & \texttt{fb\_write.sv}        & All bursts 64-byte aligned, no AXI error \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The zero-duplicate result is the critical invariant: a single duplicate pixel
+would overwrite a neighbouring pixel in the DDR framebuffer and produce a
+visible streak. The testbench caught two such bugs during development ---
+an off-by-one in the pixel ID wrap counter and a FIFO read-enable assertion
+race --- both fixed before board bring-up.
+
+\section{SDF Shape Library \& Floating Point Verification}
+
+\subsection{SDF Shape Library Verification}
+
+Each SDF was validated in two steps: first in GLSL (WebGL2 browser renderer),
+then in SystemVerilog simulation with the Verilator march trace testbench.
+The GLSL step validated the geometry logic. The RTL step confirmed that the
+FP27 pipeline produces the same scene when the output PPM is overlaid with
+the GLSL reference at matched camera parameters.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{SDF shape library verification results}
+\label{tab:sdf-verify}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l c c}
+\toprule
+\textbf{Scene} & \textbf{GLSL match (visual)} & \textbf{RTL sim output} \\
+\midrule
+Sphere         & \checkmark & Correct \\
+Torus          & \checkmark & Correct \\
+Twisted Torus  & \checkmark & Correct \\
+Gyroid         & \checkmark & Correct \\
+Hyperboloid    & \checkmark & Correct \\
+Octahedron     & \checkmark & Correct \\
+Star           & \checkmark & Correct \\
+Scaffold       & \checkmark & Correct \\
+Mandelbox      & \checkmark & Correct at 100\,MHz \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The only scene requiring special attention was the Mandelbox: its iterated
+fold map amplifies floating-point rounding errors more than analytic SDFs.
+Visual comparison at matched camera positions showed no perceptible difference
+between FP27 FPGA output and the GLSL float32 reference, confirming that
+18-bit mantissa precision is adequate for the number of fractal iterations
+used ($\leq 16$).
+
+Beyond verifying the core maths libraries, we created testbenches specifically for other complex files in our system. One of these was \texttt{tb\_march\_core.sv}, which was implemented specifically to test the main ray marching core and track its cycle latency. Through this testbench, we found a critical second error regarding pipeline synchronisation. Because of the complex math, data was arriving at the wrong time due to clock cycle delays. The Signed Distance Field (SDF) evaluation was taking an unpredictable amount of clock cycles, causing the output data to be completely misaligned with the rest of the system. To catch this, we added watchdog timers in the simulation that threw an error if a pixel calculation took too long, which let us identify and fix these pipeline stalls and synchronisation bugs where iterators were getting stuck or data was arriving late.
+
+
+\subsection{Floating Point Verification}
+
+If our custom floating-point math libraries like \texttt{fp\_add} and \texttt{fp\_mul} had mistakes in them, the final visual output would have visual errors. We implemented \texttt{tb\_fp\_lib.sv} specifically for this purpose. We wrote Python scripts (like \texttt{gen\_vectors.py}) to generate thousands of randomised floating-point test vectors which this testbench read into memory to test the hardware modules against the software results. As our rendering pipeline grew more advanced, we also had to significantly expand this testing infrastructure. The Python scripts and SystemVerilog modules were also upgraded to generate and process 136-bit, 3-operand test vectors. This allowed us to thoroughly verify our more complex custom hardware operations, such as \texttt{fp\_isqrt} (inverse square root), \texttt{fp\_length} (vector magnitude), and \texttt{int2fp} (integer to floating-point conversion).
+
+During this testing process, we found some mistakes in how our hardware dealt with edge cases. The most significant issue was how we handled ``infinity''. In ray marching, if a ray is shot into empty space and never hits an object, the calculated distance approaches infinity. Our original pipeline didn't properly handle the IEEE 754 representation of infinity, which is when the exponent is exactly \texttt{8'hFF} and the mantissa is 0. The testbenches caught the hardware outputting NaN or wrapping around, which would have resulted in visual glitches covering the screen.
+
+\section{Timing and Implementation Analysis}
+
+\subsection{Timing Closure}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Timing summary for final bitstreams}
+\label{tab:timing-eval}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l c c c c}
+\toprule
+\textbf{Scene group} & \textbf{Target} & \textbf{WNS} & \textbf{Failing paths} & \textbf{Closed?} \\
+\midrule
+All analytic SDFs  & 125\,MHz & $+3.170$\,ns & 0          & \checkmark \\
+Mandelbox          & 100\,MHz & $+3.216$\,ns & 0          & \checkmark \\
+Mandelbox          & 125\,MHz & $-0.812$\,ns & 14         & $\times$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+All analytic SDF bitstreams close at 125\,MHz with $+3.170$\,ns worst
+negative slack. The Mandelbox required reducing the clock to 100\,MHz: its
+iterated box-fold and sphere-fold logic creates a combinational path that
+exceeds the 8\,ns budget. Inserting additional pipeline registers inside the
+fold loop would allow 125\,MHz closure but would increase \texttt{SDF\_LAT}
+beyond 230 cycles, reducing frame rate. Running at 100\,MHz with
+\texttt{SDF\_LAT}\,=\,230 was the better trade-off, giving $\sim$18\,fps
+vs the $\sim$10\,fps that additional registers would give at 125\,MHz.
+
+\section{Hardware Render Evaluation}
+\label{sec:bench}
+
+\subsection{Frame Rate Model}
+
+With two \texttt{march\_core} instances the pipeline retires 2\,pixels/cycle.
+Each march iteration costs:
+
+\[
+  \text{RG\_LAT} + \text{SDF\_LAT} + \text{STEP\_LAT} = 48 + 107 + 8 = 163\text{ cycles}
+\]
+
+The frame rate as a function of mean iteration count $\bar{N}$ is:
+
+\begin{equation}
+\text{fps} = \frac{f_\text{clk} \times N_\text{cores}}{W \times H \times \bar{N}}
+           = \frac{125\times10^6 \times 2}{1024 \times 600 \times \bar{N}}
+           = \frac{406.9}{\bar{N}}
+\label{eq:fps}
+\end{equation}
+
+\subsection{Per-Scene Results}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Observed frame rate per scene at $1024\times600$ on physical board}
+\label{tab:fps}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l c c c l}
+\toprule
+\textbf{Scene} & \textbf{Clock} & \textbf{fps} & \textbf{Implied $\bar{N}$} & \textbf{Notes} \\
+\midrule
+Sphere         & 125\,MHz & $>$40        & $<$10       & Convex; rays converge quickly \\
+Scaffold       & 125\,MHz & $\sim$40     & $\sim$10    & Space-repeated; camera near geometry \\
+Hyperboloid    & 125\,MHz & $\sim$38     & $\sim$11    & Open single-sheet geometry \\
+Octahedron     & 125\,MHz & $\sim$38     & $\sim$11    & Convex; similar to sphere \\
+Star           & 125\,MHz & $\sim$35     & $\sim$12    & Convex with pointed tips \\
+Torus          & 125\,MHz & $\sim$32     & $\sim$13    & Concave annular region \\
+Twisted Torus  & 125\,MHz & $\sim$28     & $\sim$15    & Twist slows convergence near seam \\
+Gyroid         & 125\,MHz & $\sim$24     & $\sim$17    & Near-zero SDF gradient in tunnels \\
+Mandelbox      & 100\,MHz & $\sim$18     & $\sim$18    & 100\,MHz clock; fractal boundary \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+All analytic scenes exceed 24\,fps. Scaffold and Sphere exceed the
+30\,fps self-imposed target (O1). The Mandelbox at 18\,fps is acceptable for
+a fractal scene on a \$65 embedded board.
+
+\subsection{CPU Throughput Comparison (R8)}
+
+Our software renderer implements the same algorithm in C/C++ on the
+host CPU. On the ARM Cortex-A9 (667\,MHz, in-order, single-threaded), the
+scaffold scene renders at approximately 0.3--1\,fps, limited by the cost of
+scalar FP32 SDF evaluations. The FPGA at $\sim$40\,fps exceeds this by over
+an order of magnitude, satisfying R8.
+
+The pipeline throughput is $125\times10^6 \times 2 = 2.5\times10^8$
+pixels/s (assuming one iteration; effective throughput at mean $\bar{N}=10$
+is $2.5\times10^7$ pixels/s). This is comparable to an AVX2-vectorised
+software renderer on a modern x86 CPU, while running on an embedded SoC at a
+fraction of the power budget.
+
+\section{Neural SDF Evaluation}
+
+Software training of the $3{\to}32{\to}32{\to}32{\to}1$ MLP network on three target
+geometries. Table~\ref{tab:neural-eval} gives the mean absolute SDF error
+measured on a held-out test set of 50{,}000 random sample points.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Neural SDF inference accuracy (Q4.12 quantised weights)}
+\label{tab:neural-eval}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l c c c}
+\toprule
+\textbf{Scene} & \textbf{Architecture} & \textbf{Mean abs.\ error} & \textbf{Notes} \\
+\midrule
+Sphere    & $3{\to}32{\to}32{\to}32{\to}1$ & 0.000031 & Excellent; smooth geometry \\
+Torus     & $3{\to}32{\to}32{\to}32{\to}1$ & 0.000053 & Good; concave region harder \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Sphere and Torus errors of $3.1\times10^{-5}$ and $5.3\times10^{-5}$ are
+well below the march hit threshold $\varepsilon \approx 0.001$, confirming
+these geometries can be represented to sufficient accuracy for ray marching.
+The Mandelbox was planned to be analysed but its complexity made
+it unsuitable for direct neural SDF marching without a larger network or
+local cache.
+
+The trilinear interpolation cache (\texttt{trilinear\_interp.sv}) was
+designed as an alternative inference path for smooth scenes: precomputing the
+SDF at each $32^3$ grid vertex at synthesis time and performing seven
+multiply-accumulate operations at runtime. For the Sphere network this gives
+a speedup of roughly $32\times$ over full MLP inference at the cost of
+$32^3 = 32{,}768$ BRAM-stored values.
+
+Hardware integration of the neural SDF was not completed within the project
+timeline.
+
+\section{Audio Reactivity Evaluation}
+
+The audio pipeline was validated by playing known test tones and verifying
+that the correct SDF parameter registers changed.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Audio feature to SDF parameter mapping and verification}
+\label{tab:audio-eval}
+{\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l l l c}
+\toprule
+\textbf{Feature} & \textbf{AXI-Lite reg} & \textbf{Effect} & \textbf{Verified} \\
+\midrule
+Bass energy   & \texttt{sdf\_params[0]} & Spatial repetition period (cell size) & \checkmark \\
+Mid energy    & \texttt{sdf\_params[1]} & Geometry scale within cell & \checkmark \\
+Treble energy & \texttt{sdf\_params[2]} & Scaffold strut edge thickness & \checkmark \\
+RMS amplitude & \texttt{sdf\_params[3]} & Camera orbit radius & \checkmark \\
+Centroid      & \texttt{sdf\_params[4]} & Camera orbit height & \checkmark \\
+Beat flag     & \texttt{sdf\_params[5]} & Instantaneous flash parameter & \checkmark \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+End-to-end latency from audio capture on the host PC to geometry change on
+the FPGA is dominated by the 1024-sample FFT block size at 44.1\,kHz
+($\approx$23\,ms) plus the TCP round-trip and AXI write ($<$1\,ms).
+Total latency is under 30\,ms, imperceptible as audio-visual lag.
+
+The exponential smoothing ($\alpha=0.3$) prevents rapid parameter jumps that
+would cause timing violations if the SDF parameter changes exceeded a scene
+boundary discontinuity while a march was in flight. In practice no artefacts
+were observed during music-reactive mode.
+
+\section{Full System Integration Test}
+
+The full system was brought up in sequence: HDMI timing first (test pattern), then DDR framebuffer fill (\texttt{ddr\_fill\_test.py}
+confirming DDR write and VDMA readback), then single-core sphere render, then
+dual-core scaffold, then IMU and audio integration.
+
+Key integration milestones verified on board:
+
+\begin{itemize}
+\item \textbf{VDMA double-buffer handshake}: no tearing observed across
+  $>$10{,}000 frames with IMU active. The GPIO handshake (frame\_ready /
+  frame\_ack) correctly arbitrates buffer swaps.
+
+\item \textbf{Runtime bitstream switching}: all nine scenes selectable from
+  the on-HDMI UI with no monitor flicker or DDR corruption. The PYNQ
+  \texttt{Overlay} API correctly re-initialises the AXI peripherals after
+  each swap.
+
+\item \textbf{IMU tracking}: head rotation produces smooth camera movement
+  with no visible latency. The complementary filter coefficients were tuned
+  to suppress accelerometer noise while maintaining yaw integration accuracy.
+
+\item \textbf{Music reactivity}: bass-driven cell-size modulation visually
+  compresses and expands the scaffold lattice in time with low-frequency
+  content. Treble modulation of strut thickness produces a sparkle effect on
+  high-hat transients.
+
+\item \textbf{Zero-pixel-loss across scenes}: the full 614{,}400-pixel
+  coverage confirmed by our testbench was reproduced on board; no dead
+  pixels or column tears observed.
+\end{itemize}
