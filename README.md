@@ -5,7 +5,7 @@ A real-time 3D ray marcher built from scratch on the FPGA fabric of a PYNQ-Z1 (Z
 **Imperial College London — Year 2 group project (EEE/EIE), June 2026.**
 
 
-Note. If this "main" version has missing code, look in pre_final_scaffold. That one has all the working code no exception.
+*Note. If this "main" version has missing code, look in pre_final_scaffold. That one has all the working code no exception.*
 
 ---
 
