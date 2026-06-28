@@ -3,39 +3,29 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $PSScriptRoot
 
-$RTL  = "$repoRoot/RTL"
-$FP   = "$RTL/FP_Lib"
-$CORE = "$RTL/core"
-$CTRL = "$RTL/control"
-$VID  = "$RTL/video"
-$SDF  = "$RTL/sdf"
-
 $sources = @(
     "sim_top.sv",
-    "$CORE/march_core.sv",
-    "$CORE/repeat_mod_cell.sv",
-    "$CORE/ray_gen.sv",
-    "$CORE/state_pipe.v",
-    "$CORE/state_pipe_unpacked_array.sv",
-    "$SDF/menger_sdf.sv",
-    "$CTRL/pixel_dispatch.sv",
-    "$CTRL/feedback_ctrl.sv",
-    "$CTRL/FIFO.sv",
-    "$VID/ddr_rgb_writer.sv",
-    "$VID/palette.sv",
-    "$FP/fp_add.v",
-    "$FP/fp_sub.v",
-    "$FP/fp_mul.v",
-    "$FP/fp_abs.v",
-    "$FP/fp_min.v",
-    "$FP/fp_max.v",
-    "$FP/fp_isqrt.v",
-    "$FP/fp_length.v",
-    "$FP/fp_negate.v",
-    "$FP/fp_mod2.v",
-    "$FP/fp_normalize.sv",
-    "$FP/fp_mul_vec3_mat33.sv",
-    "$FP/int2fp.v",
+    "$repoRoot/rtl/core/march_core.sv",
+    "$repoRoot/rtl/core/repeat_cell.sv",
+    "$repoRoot/rtl/sdf/scaffold_sdf.v",
+    "$repoRoot/rtl/sdf/twisted_torus_sdf.v",
+    "$repoRoot/rtl/core/state_pipe.v",
+    "$repoRoot/rtl/core/ray_gen.sv",
+    "$repoRoot/rtl/control/pixel_dispatch.sv",
+    "$repoRoot/rtl/control/feedback_ctrl.sv",
+    "$repoRoot/rtl/control/FIFO.sv",
+    "$repoRoot/rtl/video/ddr_rgb_writer.sv",
+    "$repoRoot/rtl/video/palette.sv",
+    "$repoRoot/rtl/fp/fp_add.v",
+    "$repoRoot/rtl/fp/fp_sub.v",
+    "$repoRoot/rtl/fp/fp_mul.v",
+    "$repoRoot/rtl/fp/fp_abs.v",
+    "$repoRoot/rtl/fp/fp_min.v",
+    "$repoRoot/rtl/fp/fp_max.v",
+    "$repoRoot/rtl/fp/fp_isqrt.v",
+    "$repoRoot/rtl/fp/fp_length.v",
+    "$repoRoot/rtl/fp/fp_negate.v",
+    "$repoRoot/rtl/fp/int2fp.v",
     "sim_main.cpp"
 )
 
@@ -48,3 +38,4 @@ verilator --cc --exe --build -sv `
     -o Vsim_top
 
 & ".\obj_dir\Vsim_top.exe"
+& "$PSScriptRoot\convert_ppm_to_png.ps1"

@@ -32,4 +32,3 @@ add_cells_to_pblock [get_pblocks pblock_compute] [get_cells inst1_top/inst1_mc]
 resize_pblock [get_pblocks pblock_compute] -add {SLICE_X0Y0:SLICE_X69Y149}
 resize_pblock [get_pblocks pblock_compute] -add {RAMB36_X0Y0:RAMB36_X2Y29}
 resize_pblock [get_pblocks pblock_compute] -add {DSP48_X0Y0:DSP48_X3Y59}
-

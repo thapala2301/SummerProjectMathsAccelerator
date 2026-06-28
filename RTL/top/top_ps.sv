@@ -1,8 +1,3 @@
-/*
-wiring block diagram and top, barely change. 
-Block diagram wrapper.
-*/
-
 module top_ps (
     input  logic        clk,
     input  logic        rst_n,
@@ -43,30 +38,6 @@ logic [80:0]  cam_origin_flat;
 logic [31:0]  frame_base_0;
 logic [31:0]  frame_base_1;
 logic [319:0] scene_ctrl_flat;
-// Hardcoded scene params — fp27 constants, no AXI wiring needed yet
-// Layout mirrors top.sv: each field at its bit offset, gaps zeroed
-assign scene_ctrl_flat = {
-    5'b0,          // [319:315] unused
-    27'h0,         // [314:288] noise
-    5'b0,          // [287:283] gap
-    27'h0,         // [282:256] spectral
-    5'b0,          // [255:251] gap
-    27'h0,         // [250:224] level
-    5'b0,          // [223:219] gap
-    27'h0,         // [218:192] beat_pulse
-    8'b0,          // [191:184] gap
-    24'h00E5CC,    // [183:160] shape_rgb  (electric cyan)
-    8'b0,          // [159:152] gap
-    24'h000810,    // [151:128] bg_rgb     (near black)
-    5'b0,          // [127:123] gap
-    27'h0,         // [122:96]  shape_extra (unused by menger)
-    5'b0,          // [95:91]   gap
-    27'h1F80000,   // [90:64]   shape_size  = 1.0  (menger box half-extent)
-    5'b0,          // [63:59]   gap
-    27'h1F80000,   // [58:32]   half_cell   = 1.0
-    5'b0,          // [31:27]   gap
-    27'h2000000    // [26:0]    cell_sz     = 2.0  (tight pack, sponges fill space)
-};
 logic [31:0]  vid_data;
 logic [23:0]  bd_vid_data;
 logic         vid_hsync;
@@ -156,15 +127,14 @@ control_bd_wrapper inst1_ps_bd (
     .cam_origin_flat(cam_origin_flat),
     .frame_base_0(frame_base_0),
     .frame_base_1(frame_base_1),
+    .scene_ctrl_flat(scene_ctrl_flat),
     .pixel_clk_in(pixel_clk_out),
     .pixel_aresetn_in(pixel_aresetn_out),
     .vid_data(bd_vid_data),
     .vid_hsync(vid_hsync),
     .vid_vsync(vid_vsync),
     .vid_active(vid_active),
-    .frame_ready_valid(frame_status[1]),
-    .frame_ready_bank(frame_status[0]),
-    .btns(3'b0),
+    .frame_status(frame_status),
     .frame_ack(bd_frame_ack)
 );
 

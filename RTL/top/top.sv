@@ -1,14 +1,9 @@
-/*
-The PL design, instantiate everything
-*/
-
 module top #(
     parameter int FP_W = 27
 ) (
     input  logic       clk,
     input  logic       rst_n,
-    input  logic [9*FP_W-1:0] lookat_flat, // AXI regs can only transfer plain flat bit vectors, no unpacked arrays
-    //ps writes to AXI regs, which output lookat_flat as single wide buses. AXI reg interface must be flat bus
+    input  logic [9*FP_W-1:0] lookat_flat,
     input  logic [3*FP_W-1:0] cam_origin_flat,
     input  logic [31:0] frame_base_0,
     input  logic [31:0] frame_base_1,
@@ -44,28 +39,6 @@ module top #(
     output logic [2:0] hdmi_tx_data_p,
     output logic [2:0] hdmi_tx_data_n
 );
-localparam int RG_LAT = 49;          // +1 extra reg in ray_gen s1->s2 path
-localparam int REPEAT_LAT = 18;      // fp_mod2 (6 cycles): 4+6+4+4=18
-localparam int SCENE_CORE_LAT = 83; // menger_sdf: fp_min split + combine 2-stage
-localparam int SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT;
-localparam int STEP_LAT = 8;
-localparam int MAX_ITER = 128;
-localparam [26:0] HIT_THRESH = {1'b0, 8'd117, 18'h01893};
-localparam [26:0] HALF_IPD = 27'h1E7AE14;
-
-// lookat[0:2] is the camera right vector; stereo is a parallel sideways offset.
-fp_mul inst_eye_offset_x(.clk(sys_clk), .a(lookat_frame[0]), .b(HALF_IPD), .out(eye_offset[0]));
-fp_mul inst_eye_offset_y(.clk(sys_clk), .a(lookat_frame[1]), .b(HALF_IPD), .out(eye_offset[1]));
-fp_mul inst_eye_offset_z(.clk(sys_clk), .a(lookat_frame[2]), .b(HALF_IPD), .out(eye_offset[2]));
-
-fp_sub inst_left_eye_x(.clk(sys_clk), .a(cam_origin_frame[0]), .b(eye_offset[0]), .out(cam_origin_left[0]));
-fp_sub inst_left_eye_y(.clk(sys_clk), .a(cam_origin_frame[1]), .b(eye_offset[1]), .out(cam_origin_left[1]));
-fp_sub inst_left_eye_z(.clk(sys_clk), .a(cam_origin_frame[2]), .b(eye_offset[2]), .out(cam_origin_left[2]));
-
-fp_add inst_right_eye_x(.clk(sys_clk), .a(cam_origin_frame[0]), .b(eye_offset[0]), .out(cam_origin_right[0]));
-fp_add inst_right_eye_y(.clk(sys_clk), .a(cam_origin_frame[1]), .b(eye_offset[1]), .out(cam_origin_right[1]));
-fp_add inst_right_eye_z(.clk(sys_clk), .a(cam_origin_frame[2]), .b(eye_offset[2]), .out(cam_origin_right[2]));
-
 
 logic sys_clk;
 logic clk_pixel;
@@ -109,59 +82,10 @@ generate
     end
 endgenerate
 
-//for ray gen
-logic [26:0] eye_offset[0:2];
-logic [26:0] cam_origin_left[0:2];
-logic [26:0] cam_origin_right[0:2];
-// = 0.032 approx. 
-//Half Inter Pupillary Distance, IPD is phys gap btw the two eyes: 63mm, so half is 31.5mm: how far each eye is offset left or right from center of head
-//to render stereo, need two diff cam positions, one per eye: shift each one sideways along cam right vector
-//stereo separation is purely horizontal; so only offset along right ie x in xyz
-//eye_offset = HALF_IPD × (right_x, right_y, right_z)
-// lookat[0:2] is the camera right vector; stereo is a parallel sideways offset.
-//stage 1: ray gen, rg_lat = 48
-
-//all shared by single ray gen output
-logic [26:0] rg_dir [0:2];
-logic [26:0] rg_orig [0:2];
-logic [19:0] rg_pix_id;
-logic rg_valid;
-
-//core arbitrage
-logic core_sel, core_sel_d;
-logic arb_pix_done;
-ray_gen u0_raygen (
-    .clk(sys_clk),
-    .rst_n(~rst), // was rst_n (port=0 when button unpressed, kept ray_gen valid_out=0 forever)
-    .pix_x(pd_x),
-    .pix_y(pd_y),
-    .pix_id_in(pd_pix_id),
-    .valid_in(pd_valid),
-    .lookat(lookat_frame),
-    .cam_origin_left(cam_origin_left), //problem not latched
-    .cam_origin_right(cam_origin_right),
-    .ray_orig(rg_orig),
-    .ray_dir(rg_dir),
-    .pix_id_out(rg_pix_id),
-    .valid_out(rg_valid),
-    .pipeline_ready()
-);
-
-
-// top_ps.sv hardwires scene_ctrl_flat='0, so these would all be 0:
-// - half_cell=0 breaks repeat_mod_cell centering (p folds to [0,2) not [-1,1))
-// - scene_shape_size=0 makes menger box SDF = |p| (never hits)
-// -> hardcode Menger sponge constants until scene_ctrl AXI is wired.
-// cell_sz=2.0 matches fp_mod2 which does mod 2.0 exactly.
-// Restore original assigns below when scene_ctrl AXI is wired:
-// assign scene_cell_sz    = scene_ctrl_flat[26:0];
-// assign scene_half_cell  = scene_ctrl_flat[58:32];
-// assign scene_shape_size = scene_ctrl_flat[90:64];
-// assign scene_shape_extra = scene_ctrl_flat[122:96];
-assign scene_cell_sz    = 27'h2000000; // FP27 2.0
-assign scene_half_cell  = 27'h1FC0000; // FP27 1.0
-assign scene_shape_size = 27'h1FC0000; // FP27 1.0 (Menger box half-extent)
-assign scene_shape_extra = 27'h0;      // unused by menger_sdf
+assign scene_cell_sz = scene_ctrl_flat[26:0];
+assign scene_half_cell = scene_ctrl_flat[58:32];
+assign scene_shape_size = scene_ctrl_flat[90:64];
+assign scene_shape_extra = scene_ctrl_flat[122:96];
 assign scene_bg_rgb = scene_ctrl_flat[151:128];
 assign scene_shape_rgb = scene_ctrl_flat[183:160];
 assign scene_beat_pulse = scene_ctrl_flat[218:192];
@@ -171,46 +95,42 @@ assign scene_noise = scene_ctrl_flat[314:288];
 
 logic [10:0] pd_x;
 logic [9:0]  pd_y;
-logic [19:0] pd_pix_id, arb_out_pix_id;
-logic [7:0] arb_out_iter;
+logic [19:0] pd_pix_id;
 logic        pd_valid;
-logic        fc_stall_0, fc_stall_1;
+logic        fc_stall;
 
-//inst 0,1,2
-logic [10:0] fc_x_0, fc_x_1;
-logic [9:0]  fc_y_0, fc_y_1;
-logic [19:0] fc_pix_id_0, fc_pix_id_1;
-logic [26:0] fc_pos_x_0, fc_pos_x_1;
-logic [26:0] fc_pos_y_0, fc_pos_y_1;
-logic [26:0] fc_pos_z_0, fc_pos_z_1;
-logic [26:0] fc_dir_x_0, fc_dir_x_1;
-logic [26:0] fc_dir_y_0, fc_dir_y_1;
-logic [26:0] fc_dir_z_0, fc_dir_z_1;
-logic [7:0]  fc_iter_0, fc_iter_1;
-logic        fc_valid_0, fc_valid_1;
+logic [10:0] fc_x;
+logic [9:0]  fc_y;
+logic [19:0] fc_pix_id;
+logic [26:0] fc_pos_x;
+logic [26:0] fc_pos_y;
+logic [26:0] fc_pos_z;
+logic [26:0] fc_dir_x;
+logic [26:0] fc_dir_y;
+logic [26:0] fc_dir_z;
+logic [7:0]  fc_iter;
+logic        fc_valid;
 
-logic [19:0] mc_fb_pix_id_0, mc_fb_pix_id_1;
-logic [26:0] mc_fb_pos_x_0, mc_fb_pos_x_1;
-logic [26:0] mc_fb_pos_y_0, mc_fb_pos_y_1;
-logic [26:0] mc_fb_pos_z_0, mc_fb_pos_z_1;
-logic [26:0] mc_fb_dir_x_0, mc_fb_dir_x_1;
-logic [26:0] mc_fb_dir_y_0, mc_fb_dir_y_1;
-logic [26:0] mc_fb_dir_z_0, mc_fb_dir_z_1;
-logic [7:0]  mc_fb_iter_0, mc_fb_iter_1;
-logic        mc_fb_valid_0, mc_fb_valid_1;
+logic [19:0] mc_fb_pix_id;
+logic [26:0] mc_fb_pos_x;
+logic [26:0] mc_fb_pos_y;
+logic [26:0] mc_fb_pos_z;
+logic [26:0] mc_fb_dir_x;
+logic [26:0] mc_fb_dir_y;
+logic [26:0] mc_fb_dir_z;
+logic [7:0]  mc_fb_iter;
+logic        mc_fb_valid;
 
-logic        mc_pix_done_0, mc_pix_done_1;
-logic [19:0] mc_out_pix_id_0, mc_out_pix_id_1;
-logic [7:0]  mc_out_iter_0, mc_out_iter_1;
+logic        mc_pix_done;
+logic [19:0] mc_out_pix_id;
+logic [7:0]  mc_out_iter;
 
 logic        dispatch_pipeline_ready;
 logic        render_bank;
 logic        dispatch_enable;
 logic        frame_drain_wait;
-logic [19:0] dispatch_count; //counts pixels sent from pixel dispatch this frame.
-//when hits frameraycount , all px dispatches: disable dispatch
-logic [19:0] done_count; //counts pix done signals back from march cores
-//when hits frameraycount, all px rendered -> start drain wait
+logic [19:0] dispatch_count;
+logic [19:0] done_count;
 logic        writer_fifo_almost_full;
 logic        writer_drained;
 logic        frame_base_valid;
@@ -235,14 +155,13 @@ assign ctrl_clk_out = sys_clk;
 assign ctrl_aresetn_out = ~rst;
 assign pixel_clk_out = clk_pixel;
 assign pixel_aresetn_out = ~rst;
-assign dispatch_pipeline_ready = ~fc_stall_0 & dispatch_enable & ~writer_fifo_almost_full;
+assign dispatch_pipeline_ready = ~fc_stall & dispatch_enable & ~writer_fifo_almost_full;
 assign frame_base_valid = (frame_base_0 != 32'd0) && (frame_base_1 != 32'd0);
 assign frame_status = {frame_ready_valid, frame_ready_bank};
 assign hdmi_data = vid_active ? vid_data[23:0] : 24'd0;
 
 always_ff @(posedge sys_clk) begin
     if (rst) begin
-        core_sel <= 2'b0;
         render_bank <= 1'b1;
         dispatch_enable <= 1'b0;
         frame_drain_wait <= 1'b0;
@@ -268,7 +187,6 @@ always_ff @(posedge sys_clk) begin
             cam_origin_frame[cam_i] <= '0;
         end
     end else if (!frame_base_valid) begin
-        core_sel <= 2'b0;
         render_bank <= 1'b1;
         dispatch_enable <= 1'b0;
         frame_drain_wait <= 1'b0;
@@ -312,18 +230,15 @@ always_ff @(posedge sys_clk) begin
         end
 
         if (dispatch_enable && pd_valid) begin
-            // core_sel <= (core_sel ==2'd1) ? 2'd0 : core_sel + 1'b1; // 2-core alternation
-            core_sel <= 2'd0;
             if (dispatch_count == FRAME_RAY_COUNT - 1'b1) begin
                 dispatch_count <= 20'd0;
                 dispatch_enable <= 1'b0;
-
             end else begin
                 dispatch_count <= dispatch_count + 1'b1;
             end
         end
 
-        if (arb_pix_done) begin
+        if (mc_pix_done) begin
             if (done_count == FRAME_RAY_COUNT - 1'b1) begin
                 done_count <= 20'd0;
                 frame_drain_wait <= 1'b1;
@@ -357,15 +272,10 @@ always_ff @(posedge sys_clk) begin
             scene_level_frame <= scene_level;
             scene_spectral_frame <= scene_spectral;
             scene_noise_frame <= scene_noise;
-
             dispatch_enable <= 1'b1;
         end
     end
 end
-
-assign arb_pix_done = mc_pix_done_0 | mc_pix_done_1;
-
-state_pipe #(.WIDTH(1), .DEPTH(RG_LAT)) pipe_core_sel(.clk(sys_clk), .in(core_sel), .out(core_sel_d));
 
 pixel_dispatch inst1_px_disp(
     .clk(sys_clk),
@@ -376,146 +286,71 @@ pixel_dispatch inst1_px_disp(
     .valid(pd_valid),
     .pix_id(pd_pix_id)
 );
-feedback_ctrl inst0_fb_ctrl(
+
+feedback_ctrl inst1_fb_ctrl(
     .clk(sys_clk),
     .rst(rst),
     .x_pixel(pd_x),
     .y_pixel(pd_y),
-    .valid(pd_valid), // was: pd_valid & (core_sel == 2'd0)
+    .valid(pd_valid),
     .pix_id(pd_pix_id),
-    .fb_pix_id(mc_fb_pix_id_0),
-    .fb_pos_x({5'b0, mc_fb_pos_x_0}),
-    .fb_pos_y({5'b0, mc_fb_pos_y_0}),
-    .fb_pos_z({5'b0, mc_fb_pos_z_0}),
-    .fb_ray_dir_x({5'b0, mc_fb_dir_x_0}),
-    .fb_ray_dir_y({5'b0, mc_fb_dir_y_0}),
-    .fb_ray_dir_z({5'b0, mc_fb_dir_z_0}),
-    .fb_iteration_count(mc_fb_iter_0),
-    .fb_validity(mc_fb_valid_0),
+    .fb_pix_id(mc_fb_pix_id),
+    .fb_pos_x({5'b0, mc_fb_pos_x}),
+    .fb_pos_y({5'b0, mc_fb_pos_y}),
+    .fb_pos_z({5'b0, mc_fb_pos_z}),
+    .fb_ray_dir_x({5'b0, mc_fb_dir_x}),
+    .fb_ray_dir_y({5'b0, mc_fb_dir_y}),
+    .fb_ray_dir_z({5'b0, mc_fb_dir_z}),
+    .fb_iteration_count(mc_fb_iter),
+    .fb_validity(mc_fb_valid),
     .pipeline_ready(1'b1),
-    .out_x(fc_x_0),
-    .out_y(fc_y_0),
-    .out_pix_id(fc_pix_id_0),
-    .out_pos_x(fc_pos_x_0),
-    .out_pos_y(fc_pos_y_0),
-    .out_pos_z(fc_pos_z_0),
-    .out_ray_dir_x(fc_dir_x_0),
-    .out_ray_dir_y(fc_dir_y_0),
-    .out_ray_dir_z(fc_dir_z_0),
-    .out_iteration_count(fc_iter_0),
-    .out_validity(fc_valid_0),
-    .stall(fc_stall_0)
+    .out_x(fc_x),
+    .out_y(fc_y),
+    .out_pix_id(fc_pix_id),
+    .out_pos_x(fc_pos_x),
+    .out_pos_y(fc_pos_y),
+    .out_pos_z(fc_pos_z),
+    .out_ray_dir_x(fc_dir_x),
+    .out_ray_dir_y(fc_dir_y),
+    .out_ray_dir_z(fc_dir_z),
+    .out_iteration_count(fc_iter),
+    .out_validity(fc_valid),
+    .stall(fc_stall)
 );
 
-// feedback_ctrl inst1_fb_ctrl( // 2-core: commented out for 1-core build
-//     .clk(sys_clk),
-//     .rst(rst),
-//     .x_pixel(pd_x),
-//     .y_pixel(pd_y),
-//     .valid(pd_valid & (core_sel == 2'd1)),
-//     .pix_id(pd_pix_id),
-//     .fb_pix_id(mc_fb_pix_id_1),
-//     .fb_pos_x({5'b0, mc_fb_pos_x_1}),
-//     .fb_pos_y({5'b0, mc_fb_pos_y_1}),
-//     .fb_pos_z({5'b0, mc_fb_pos_z_1}),
-//     .fb_ray_dir_x({5'b0, mc_fb_dir_x_1}),
-//     .fb_ray_dir_y({5'b0, mc_fb_dir_y_1}),
-//     .fb_ray_dir_z({5'b0, mc_fb_dir_z_1}),
-//     .fb_iteration_count(mc_fb_iter_1),
-//     .fb_validity(mc_fb_valid_1),
-//     .pipeline_ready(1'b1),
-//     .out_x(fc_x_1),
-//     .out_y(fc_y_1),
-//     .out_pix_id(fc_pix_id_1),
-//     .out_pos_x(fc_pos_x_1),
-//     .out_pos_y(fc_pos_y_1),
-//     .out_pos_z(fc_pos_z_1),
-//     .out_ray_dir_x(fc_dir_x_1),
-//     .out_ray_dir_y(fc_dir_y_1),
-//     .out_ray_dir_z(fc_dir_z_1),
-//     .out_iteration_count(fc_iter_1),
-//     .out_validity(fc_valid_1),
-//     .stall(fc_stall_1)
-// );
-assign fc_stall_1 = 1'b0;
-
-march_core inst0_mc(
+march_core inst1_mc(
     .clk(sys_clk),
     .rst_n(~rst),
-    .in_pix_id(fc_pix_id_0),
-    .in_pos_x(fc_pos_x_0),
-    .in_pos_y(fc_pos_y_0),
-    .in_pos_z(fc_pos_z_0),
-    .in_ray_dir_x(fc_dir_x_0),
-    .in_ray_dir_y(fc_dir_y_0),
-    .in_ray_dir_z(fc_dir_z_0),
-    .in_iter(fc_iter_0),
-    .in_valid(fc_valid_0),
-    .rg_dir(rg_dir),
-    .rg_orig(rg_orig),
-    .rg_pix_id(rg_pix_id),
-    .rg_valid(rg_valid), // was: rg_valid & (core_sel_d == 2'd0)
+    .in_x(fc_x),
+    .in_y(fc_y),
+    .in_pix_id(fc_pix_id),
+    .in_pos_x(fc_pos_x),
+    .in_pos_y(fc_pos_y),
+    .in_pos_z(fc_pos_z),
+    .in_ray_dir_x(fc_dir_x),
+    .in_ray_dir_y(fc_dir_y),
+    .in_ray_dir_z(fc_dir_z),
+    .in_iter(fc_iter),
+    .in_valid(fc_valid),
+    .lookat(lookat_frame),
+    .cam_origin(cam_origin_frame),
     .scene_cell_sz(scene_cell_sz_frame),
     .scene_half_cell(scene_half_cell_frame),
     .scene_shape_size(scene_shape_size_frame),
     .scene_shape_extra(scene_shape_extra_frame),
-    .pix_done(mc_pix_done_0),
-    .out_pix_id(mc_out_pix_id_0),
-    .out_iter(mc_out_iter_0),
-    .fb_iter(mc_fb_iter_0),
-    .fb_ray_dir_x(mc_fb_dir_x_0),
-    .fb_ray_dir_y(mc_fb_dir_y_0),
-    .fb_ray_dir_z(mc_fb_dir_z_0),
-    .fb_pos_x(mc_fb_pos_x_0),
-    .fb_pos_y(mc_fb_pos_y_0),
-    .fb_pos_z(mc_fb_pos_z_0),
-    .fb_pix_id(mc_fb_pix_id_0),
-    .fb_valid(mc_fb_valid_0),
-    .in_dist(27'h0)
+    .pix_done(mc_pix_done),
+    .out_pix_id(mc_out_pix_id),
+    .out_iter(mc_out_iter),
+    .fb_iter(mc_fb_iter),
+    .fb_ray_dir_x(mc_fb_dir_x),
+    .fb_ray_dir_y(mc_fb_dir_y),
+    .fb_ray_dir_z(mc_fb_dir_z),
+    .fb_pos_x(mc_fb_pos_x),
+    .fb_pos_y(mc_fb_pos_y),
+    .fb_pos_z(mc_fb_pos_z),
+    .fb_pix_id(mc_fb_pix_id),
+    .fb_valid(mc_fb_valid)
 );
-
-// march_core inst1_mc( // 2-core: commented out for 1-core build
-//     .clk(sys_clk),
-//     .rst_n(~rst),
-//     .in_pix_id(fc_pix_id_1),
-//     .in_pos_x(fc_pos_x_1),
-//     .in_pos_y(fc_pos_y_1),
-//     .in_pos_z(fc_pos_z_1),
-//     .in_ray_dir_x(fc_dir_x_1),
-//     .in_ray_dir_y(fc_dir_y_1),
-//     .in_ray_dir_z(fc_dir_z_1),
-//     .in_iter(fc_iter_1),
-//     .in_valid(fc_valid_1),
-//     .rg_dir(rg_dir),
-//     .rg_orig(rg_orig),
-//     .rg_pix_id(rg_pix_id),
-//     .rg_valid(rg_valid & (core_sel_d == 2'd1)),
-//     .scene_cell_sz(scene_cell_sz_frame),
-//     .scene_half_cell(scene_half_cell_frame),
-//     .scene_shape_size(scene_shape_size_frame),
-//     .scene_shape_extra(scene_shape_extra_frame),
-//     .pix_done(mc_pix_done_1),
-//     .out_pix_id(mc_out_pix_id_1),
-//     .out_iter(mc_out_iter_1),
-//     .fb_iter(mc_fb_iter_1),
-//     .fb_ray_dir_x(mc_fb_dir_x_1),
-//     .fb_ray_dir_y(mc_fb_dir_y_1),
-//     .fb_ray_dir_z(mc_fb_dir_z_1),
-//     .fb_pos_x(mc_fb_pos_x_1),
-//     .fb_pos_y(mc_fb_pos_y_1),
-//     .fb_pos_z(mc_fb_pos_z_1),
-//     .fb_pix_id(mc_fb_pix_id_1),
-//     .fb_valid(mc_fb_valid_1),
-//     .in_dist(27'h0)
-// );
-assign mc_pix_done_1   = 1'b0;
-assign mc_out_pix_id_1 = 20'h0;
-assign mc_out_iter_1   = 8'h0;
-
-assign arb_out_pix_id = mc_pix_done_0 ? mc_out_pix_id_0 : mc_out_pix_id_1;
-assign arb_out_iter   = mc_pix_done_0 ? mc_out_iter_0   : mc_out_iter_1;
-
-
 
 ddr_rgb_writer #(
     .MAX_OUTSTANDING(8)
@@ -526,9 +361,9 @@ ddr_rgb_writer #(
     .frame_base_1(frame_base_1),
     .bg_rgb(scene_bg_rgb_frame),
     .shape_rgb(scene_shape_rgb_frame),
-    .pix_done(arb_pix_done),
-    .out_pix_id(arb_out_pix_id),
-    .out_iter(arb_out_iter),
+    .pix_done(mc_pix_done),
+    .out_pix_id(mc_out_pix_id),
+    .out_iter(mc_out_iter),
     .render_bank(render_bank),
     .fifo_almost_full(writer_fifo_almost_full),
     .drained(writer_drained),

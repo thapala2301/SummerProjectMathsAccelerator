@@ -17,32 +17,25 @@ module sim_top(
 wire rst = ~rst_n;
 localparam [19:0] FRAME_RAY_COUNT = 20'd153600;
 
-localparam [26:0] FP_ONE      = 27'h1FC0000; // 1.0
-localparam [26:0] FP_ZERO     = 27'h0;
-localparam [26:0] FP_NEG_ONE  = 27'h5FC0000; // -1.0
-localparam [26:0] FP_P015     = 27'h1F0CCCD; // 0.15
-localparam [26:0] FP_P45      = 27'h2048000; // 4.5
-localparam [26:0] FP_CELL_SZ  = 27'h2000000; // 2.0
-localparam [26:0] FP_HALF_CELL= 27'h1FC0000; // 1.0
-localparam [26:0] FP_SHAPE_SZ = 27'h1FC0000; // 1.0
-localparam [26:0] FP_SHAPE_EX = 27'h0;
+localparam [26:0] FP_ONE  = 27'h1FC0000;
+localparam [26:0] FP_ZERO = 27'h0;
+localparam [26:0] FP_NEG_ONE = 27'h5FC0000;
+localparam [26:0] FP_P015 = 27'h1F0CCCD;
+localparam [26:0] FP_P45 = 27'h2048000;
+localparam [26:0] FP_CELL_SZ = 27'h2090000;
+localparam [26:0] FP_HALF_CELL = 27'h2050000;
+localparam [26:0] FP_SHAPE_SIZE = 27'h02050000;
+localparam [26:0] FP_SHAPE_EXTRA = 27'h01F0CCCD;
 
-// Camera: identity lookat, origin at (0, 0.15, 4.5)
 logic [26:0] lookat[0:8];
 assign lookat[0] = FP_ONE;  assign lookat[1] = FP_ZERO; assign lookat[2] = FP_ZERO;
 assign lookat[3] = FP_ZERO; assign lookat[4] = FP_ONE;  assign lookat[5] = FP_ZERO;
 assign lookat[6] = FP_ZERO; assign lookat[7] = FP_ZERO; assign lookat[8] = FP_NEG_ONE;
 
-logic [26:0] cam_origin[0:2];
+logic [26:0] cam_origin [0:2];
 assign cam_origin[0] = FP_ZERO;
 assign cam_origin[1] = FP_P015;
 assign cam_origin[2] = FP_P45;
-
-// Ray gen outputs
-logic [26:0] rg_dir [0:2];
-logic [26:0] rg_orig[0:2];
-logic [19:0] rg_pix_id;
-logic        rg_valid;
 
 logic [10:0] pd_x;
 logic [9:0]  pd_y;
@@ -78,15 +71,15 @@ assign dispatch_pipeline_ready = ~fc_stall & dispatch_enable & ~writer_fifo_almo
 
 always_ff @(posedge clk) begin
     if (rst) begin
-        dispatch_enable  <= 1'b1;
+        dispatch_enable <= 1'b1;
         frame_drain_wait <= 1'b0;
-        frame_done       <= 1'b0;
-        dispatch_count   <= 20'd0;
-        done_count       <= 20'd0;
+        frame_done <= 1'b0;
+        dispatch_count <= 20'd0;
+        done_count <= 20'd0;
     end else if (!frame_done) begin
         if (dispatch_enable && pd_valid) begin
             if (dispatch_count == FRAME_RAY_COUNT - 1'b1) begin
-                dispatch_count  <= 20'd0;
+                dispatch_count <= 20'd0;
                 dispatch_enable <= 1'b0;
             end else begin
                 dispatch_count <= dispatch_count + 1'b1;
@@ -95,7 +88,7 @@ always_ff @(posedge clk) begin
 
         if (mc_pix_done) begin
             if (done_count == FRAME_RAY_COUNT - 1'b1) begin
-                done_count       <= 20'd0;
+                done_count <= 20'd0;
                 frame_drain_wait <= 1'b1;
             end else begin
                 done_count <= done_count + 1'b1;
@@ -104,7 +97,7 @@ always_ff @(posedge clk) begin
 
         if (frame_drain_wait && writer_drained) begin
             frame_drain_wait <= 1'b0;
-            frame_done       <= 1'b1;
+            frame_done <= 1'b1;
         end
     end
 end
@@ -117,26 +110,6 @@ pixel_dispatch inst1_px_disp(
     .y_pixel(pd_y),
     .valid(pd_valid),
     .pix_id(pd_pix_id)
-);
-
-ray_gen #(
-    .IMG_W(512),
-    .IMG_H(600)
-) u0_raygen (
-    .clk(clk),
-    .rst_n(rst_n),
-    .pix_x(pd_x),
-    .pix_y(pd_y),
-    .pix_id_in(pd_pix_id),
-    .valid_in(pd_valid),
-    .lookat(lookat),
-    .cam_origin_left(cam_origin),
-    .cam_origin_right(cam_origin),
-    .ray_orig(rg_orig),
-    .ray_dir(rg_dir),
-    .pix_id_out(rg_pix_id),
-    .valid_out(rg_valid),
-    .pipeline_ready()
 );
 
 feedback_ctrl inst1_fb_ctrl(
@@ -154,7 +127,6 @@ feedback_ctrl inst1_fb_ctrl(
     .fb_ray_dir_y({5'b0, mc_fb_dir_y}),
     .fb_ray_dir_z({5'b0, mc_fb_dir_z}),
     .fb_iteration_count(mc_fb_iter),
-    .fb_dist(27'h0),
     .fb_validity(mc_fb_valid),
     .pipeline_ready(1'b1),
     .out_x(fc_x),
@@ -167,14 +139,15 @@ feedback_ctrl inst1_fb_ctrl(
     .out_ray_dir_y(fc_dir_y),
     .out_ray_dir_z(fc_dir_z),
     .out_iteration_count(fc_iter),
-    .out_dist(),
     .out_validity(fc_valid),
     .stall(fc_stall)
 );
 
 march_core inst1_mc(
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(~rst),
+    .in_x(fc_x),
+    .in_y(fc_y),
     .in_pix_id(fc_pix_id),
     .in_pos_x(fc_pos_x),
     .in_pos_y(fc_pos_y),
@@ -183,20 +156,16 @@ march_core inst1_mc(
     .in_ray_dir_y(fc_dir_y),
     .in_ray_dir_z(fc_dir_z),
     .in_iter(fc_iter),
-    .in_dist(27'h0),
     .in_valid(fc_valid),
-    .rg_dir(rg_dir),
-    .rg_orig(rg_orig),
-    .rg_pix_id(rg_pix_id),
-    .rg_valid(rg_valid),
+    .lookat(lookat),
+    .cam_origin(cam_origin),
     .scene_cell_sz(FP_CELL_SZ),
     .scene_half_cell(FP_HALF_CELL),
-    .scene_shape_size(FP_SHAPE_SZ),
-    .scene_shape_extra(FP_SHAPE_EX),
+    .scene_shape_size(FP_SHAPE_SIZE),
+    .scene_shape_extra(FP_SHAPE_EXTRA),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),
-    .out_dist(),
     .fb_iter(mc_fb_iter),
     .fb_ray_dir_x(mc_fb_dir_x),
     .fb_ray_dir_y(mc_fb_dir_y),
@@ -205,7 +174,6 @@ march_core inst1_mc(
     .fb_pos_y(mc_fb_pos_y),
     .fb_pos_z(mc_fb_pos_z),
     .fb_pix_id(mc_fb_pix_id),
-    .fb_dist(),
     .fb_valid(mc_fb_valid)
 );
 
@@ -217,9 +185,9 @@ ddr_rgb_writer #(
     .clk(clk),
     .rst(rst),
     .frame_base_0(32'd0),
-    .frame_base_1(32'h00258000),
-    .bg_rgb(24'h000810),
-    .shape_rgb(24'h00E5CC),
+    .frame_base_1(32'h0025_8000),
+    .bg_rgb(24'h000000),
+    .shape_rgb(24'hFFFFFF),
     .pix_done(mc_pix_done),
     .out_pix_id(mc_out_pix_id),
     .out_iter(mc_out_iter),

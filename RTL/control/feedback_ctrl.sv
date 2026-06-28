@@ -28,7 +28,6 @@ module feedback_ctrl (
     input logic [31:0] fb_ray_dir_y,
     input logic [31:0] fb_ray_dir_z,
     input logic [7:0]  fb_iteration_count,
-    input logic [26:0] fb_dist, 
     input logic        fb_validity,
 
     input logic        pipeline_ready,
@@ -44,13 +43,10 @@ module feedback_ctrl (
     output logic [26:0] out_ray_dir_y,
     output logic [26:0] out_ray_dir_z,
     output logic [7:0]  out_iteration_count, //how many steps so far
-    output logic [26:0] out_dist, //distance so far
     output logic        out_validity, //whether output is valid ray to process
-
     output logic        stall //backpressure for dispatch
 );
 
-    //keep to 216
     //pix id: 20 bits, pos_x,y,z: 27*3==81 bits, dir_x,y,z = 27*3 = 81 bits, iter count : 8 bits
     //total 190 bits, each FIFO entry holds all these entries needed to resume a ray mid marching
     logic [189:0] fifo_rd_data; 
@@ -58,13 +54,8 @@ module feedback_ctrl (
     logic         fifo_empty;
     logic         fifo_almost_full;
     logic fifo_rd_en;
-    logic fifo_rd_en_d; // 1-cycle delayed: fifo_rd_data valid the cycle this is high (sync BRAM read)
 
     assign fifo_rd_en = pipeline_ready && !fifo_empty;
-    always_ff @(posedge clk) begin
-        if (rst) fifo_rd_en_d <= 1'b0;
-        else     fifo_rd_en_d <= fifo_rd_en;
-    end
 
     //fifo inst
     FIFO #(
@@ -101,7 +92,6 @@ module feedback_ctrl (
             out_ray_dir_y       <= 1'b0;
             out_ray_dir_z       <= 1'b0;
             out_iteration_count <= 1'b0;
-            out_dist <= 1'b0;
             out_validity        <= 1'b0;
         end
         else if (fifo_rd_en_d) begin
@@ -116,7 +106,6 @@ module feedback_ctrl (
             out_ray_dir_y       <= fifo_rd_data[61:35];
             out_ray_dir_z       <= fifo_rd_data[34:8];
             out_iteration_count <= fifo_rd_data[7:0];
-            out_dist            <= 27'h0;
             out_validity        <= 1'b1;
         end
         else if (fifo_empty && pipeline_ready && valid) begin
@@ -131,7 +120,6 @@ module feedback_ctrl (
             out_ray_dir_y       <= 1'b0;
             out_ray_dir_z       <= 1'b0;
             out_iteration_count <= 1'b0;
-            out_dist <= 1'b0;
             out_validity        <= 1'b1;
         end
         else begin

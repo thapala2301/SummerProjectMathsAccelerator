@@ -9,11 +9,10 @@
 module sdf_sphere(
     input clk,
     input [26:0] px, py, pz,
-    input logic [26:0] sdf_params [0:7],
     output reg [26:0] sdf_out
 );
 
-localparam [26:0] radius    = sdf_params[0];
+localparam [26:0] radius    = {1'b0, 8'd128, 18'h00000};
 
 wire [26:0] len;
 fp_length inst_len(.clk(clk), .x(px), .y(py), .z(pz), .out(len));

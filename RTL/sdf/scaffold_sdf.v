@@ -28,22 +28,33 @@ is always same as nearest surface in canonical cell, provided half_ext < cell_sz
 // march_core.sv: instantiate scaffold_sdf and set SCENE_CORE_LAT = 50
 // march_core.sv: set SCENE_CELL_SZ = 27'h2090000 and SCENE_HALF_CELL = 27'h2050000
 // ctrl.py: set CAMERA_WRAP_CELL_SZ = 10.0 and CAMERA_WRAP_HALF_CELL = 5.0
+// This module maps them onto scaffold-specific box size and frame thickness.
 
 module scaffold_sdf(
     input         clk,
     input  [26:0] px,
     input  [26:0] py,
     input  [26:0] pz,
-    input logic [26:0] sdf_params [0:7],
+    input  [26:0] shape_size,
+    input  [26:0] shape_extra,
     output reg [26:0] sdf_out
 );
 
-//b : half extent of box, e : edge thickness
+localparam [26:0] SHAPE_SIZE_MIN  = 27'h203999A; // 3.8
+localparam [26:0] SHAPE_SIZE_SPAN = 27'h1FCCCCD; // 1.2 -> max 5.0
+localparam [26:0] SHAPE_EXTRA_MIN  = 27'h1EE6666; // 0.10
+localparam [26:0] SHAPE_EXTRA_SPAN = 27'h1F30A3D; // 0.22 -> max 0.32
 
-logic [26:0] cell_sz, b_fp, e_fp;
-assign cell_sz = sdf_params[0];
-assign b_fp = sdf_params[1];
-assign e_fp = sdf_params[2];
+wire [26:0] shape_size_scaled;
+wire [26:0] shape_extra_scaled;
+wire [26:0] b_fp;
+wire [26:0] e_fp;
+
+fp_mul inst_shape_size_mul(.clk(clk), .a(shape_size), .b(SHAPE_SIZE_SPAN), .out(shape_size_scaled));
+fp_add inst_shape_size_add(.clk(clk), .a(SHAPE_SIZE_MIN), .b(shape_size_scaled), .out(b_fp));
+
+fp_mul inst_shape_extra_mul(.clk(clk), .a(shape_extra), .b(SHAPE_EXTRA_SPAN), .out(shape_extra_scaled));
+fp_add inst_shape_extra_add(.clk(clk), .a(SHAPE_EXTRA_MIN), .b(shape_extra_scaled), .out(e_fp));
 
 wire [26:0] abs_px;
 wire [26:0] abs_py;

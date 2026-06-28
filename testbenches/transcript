@@ -1,0 +1,32 @@
+# vsim -c -do "run -all; quit" tb_fp_lib 
+# Start time: 08:15:39 on Jun 12,2026
+# Loading sv_std.std
+# Loading work.tb_fp_lib
+# Loading work.fp_add
+# Loading work.fp_sub
+# Loading work.fp_mul
+# Loading work.fp_abs
+# Loading work.fp_negate
+# Loading work.fp_min
+# Loading work.fp_max
+# Loading work.fp_isqrt
+# Loading work.state_pipe
+# Loading work.fp_length
+# Loading work.int2fp
+# run -all
+# Error! [INT2FP]: Sign is wrong. Exp: 5ff65d3, Act: 1f00000
+# Error! [MUL]: Expected Infinity, but got 41febf4
+# Error! [INT2FP]: Sign is wrong. Exp: 5fc20b9, Act: 1ec3fd7
+# Error! [ISQRT]: Expected NaN, but got 0fdc147
+# Error! [INT2FP]: Exponent mismatch. Exp: 20265f6, Act: 1ec2414
+# Error! [ISQRT]: Mantissa is off by too much. Exp: 1e9af4b, Act: 1e9aee7
+# Error! [MUL]: Exponent mismatch. Exp: 02a3dee, Act: 0000000
+# Error! [INT2FP]: Exponent mismatch. Exp: 1f948e9, Act: 1cece3e
+# Error! [LENGTH]: Mantissa is off by too much. Exp: 21fae60, Act: 21fab76
+# Error! [ISQRT]: Mantissa is off by too much. Exp: 1f09a6e, Act: 1f0999f
+# TEST COMPLETION SUMMARY:
+# Total Errors Encountered:        1111
+# ** Note: $finish    : tb_fp_lib.sv(167)
+#    Time: 16022500 ps  Iteration: 1  Instance: /tb_fp_lib
+# End time: 08:15:40 on Jun 12,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0

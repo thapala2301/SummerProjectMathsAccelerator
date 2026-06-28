@@ -23,6 +23,7 @@ generate
         end
         assign out = pipe[DEPTH-1];
     end else begin : g_shallow
+    
         // FF mode for pipes up to depth 113 — saves LUTs, plenty of FF headroom
         (* shreg_extract = "no" *) reg [WIDTH-1:0] pipe [0:DEPTH-1];
         always @(posedge clk) pipe[0] <= in;

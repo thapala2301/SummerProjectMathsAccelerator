@@ -9,23 +9,16 @@
 module sdf_twisted_torus(
     input clk,
     input [26:0] px, py, pz,
-    input [26:0] sdf_params[0:7],
     output reg [26:0] sdf_out
 );
 
 localparam [26:0] FP_ZERO  = 27'h0;
-localparam [26:0] BIG_R  = sdf_params[0];
-localparam [26:0] SMALL_R  = sdf_params[1];
-localparam [26:0] TWIST  = sdf_params[2];
+localparam [26:0] BIG_R    = {1'b0, 8'd127, 18'h33333};
+localparam [26:0] SMALL_R  = {1'b0, 8'd125, 18'h4CCCD};
+localparam [26:0] TWIST    = {1'b0, 8'd125, 18'h00000};
 localparam [26:0] FP_ONE   = {1'b0, 8'd127, 18'h00000};
 localparam [26:0] FP_HALF  = {1'b0, 8'd126, 18'h00000};
 localparam [26:0] FP_SIXTH = {1'b0, 8'd124, 18'h15555};
-//localparam [26:0] BIG_R    = {1'b0, 8'd127, 18'h33333};
-//localparam [26:0] SMALL_R  = {1'b0, 8'd125, 18'h4CCCD};
-//localparam [26:0] TWIST    = {1'b0, 8'd125, 18'h00000};
-//localparam [26:0] FP_ONE   = {1'b0, 8'd127, 18'h00000};
-//localparam [26:0] FP_HALF  = {1'b0, 8'd126, 18'h00000};
-//localparam [26:0] FP_SIXTH = {1'b0, 8'd124, 18'h15555};
 
 // Calculating the twist angle
 wire [26:0] angle;

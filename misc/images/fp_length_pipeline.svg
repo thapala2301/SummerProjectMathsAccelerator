@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="pa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/>
+    </marker>
+    <marker id="pd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#c2410c"/>
+    </marker>
+    <style>
+      .ink{fill:#0f172a;} .muted{fill:#475569;} .idx{fill:#64748b;}
+      @media (prefers-color-scheme: dark){ .ink{fill:#f1f5f9;} .muted{fill:#cbd5e1;} .idx{fill:#94a3b8;} }
+    </style>
+  </defs>
+  <text x="30" y="32" class="ink" font-size="18" font-weight="700">fp_length - pipelined sqrt(x^2+y^2+z^2), 32-cycle latency</text>
+  <text x="30" y="52" class="muted" font-size="11.5">Sub-block latencies: fp_mul = 4 / fp_add = 4 / fp_isqrt = 16.  Identity: sqrt(s) = isqrt(s) x s  (avoids a divider).</text>
+  <line x1="60" y1="78" x2="900" y2="78" stroke="#94a3b8" stroke-opacity="0.6" stroke-width="1"/>
+  <g font-size="10" class="idx" text-anchor="middle">
+    <text x="60" y="72">cyc 0</text><text x="200" y="72">4</text><text x="340" y="72">8</text>
+    <text x="480" y="72">12</text><text x="760" y="72">28</text><text x="900" y="72">32</text>
+  </g>
+  <g stroke="#94a3b8" stroke-opacity="0.3" stroke-width="1">
+    <line x1="60" y1="78" x2="60" y2="430"/><line x1="200" y1="78" x2="200" y2="430"/>
+    <line x1="340" y1="78" x2="340" y2="430"/><line x1="480" y1="78" x2="480" y2="430"/>
+    <line x1="760" y1="78" x2="760" y2="430"/><line x1="900" y1="78" x2="900" y2="430"/>
+  </g>
+  <rect x="28" y="110" width="64" height="26" rx="6" fill="#eef2ff" stroke="#94a3b8"/><text x="60" y="127" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0f172a">x,y,z</text>
+  <rect x="160" y="96" width="80" height="26" rx="6" fill="#dcfce7" stroke="#15803d"/><text x="200" y="113" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">x^2 (mul)</text>
+  <rect x="160" y="128" width="80" height="26" rx="6" fill="#dcfce7" stroke="#15803d"/><text x="200" y="145" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">y^2 (mul)</text>
+  <rect x="160" y="160" width="80" height="26" rx="6" fill="#dcfce7" stroke="#15803d"/><text x="200" y="177" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">z^2 (mul)</text>
+  <rect x="300" y="112" width="80" height="26" rx="6" fill="#dbeafe" stroke="#1d4ed8"/><text x="340" y="129" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">x^2+y^2 (add)</text>
+  <rect x="300" y="160" width="80" height="26" rx="6" fill="#ffedd5" stroke="#c2410c"/><text x="340" y="177" text-anchor="middle" font-size="10" font-weight="600" fill="#0f172a">delay z^2 (4)</text>
+  <rect x="440" y="136" width="80" height="26" rx="6" fill="#dbeafe" stroke="#1d4ed8"/><text x="480" y="153" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">+z^2 = sum</text>
+  <rect x="700" y="120" width="100" height="28" rx="6" fill="#ede9fe" stroke="#7c3aed"/><text x="750" y="138" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">isqrt(sum) (16)</text>
+  <rect x="700" y="172" width="100" height="28" rx="6" fill="#ffedd5" stroke="#c2410c"/><text x="750" y="190" text-anchor="middle" font-size="10" font-weight="600" fill="#0f172a">delay sum (16)</text>
+  <rect x="850" y="146" width="84" height="28" rx="6" fill="#dcfce7" stroke="#15803d"/><text x="892" y="164" text-anchor="middle" font-size="10.5" font-weight="600" fill="#0f172a">isqrt x sum</text>
+  <rect x="850" y="186" width="84" height="24" rx="6" fill="#0f172a" stroke="#94a3b8" stroke-width="1.2"/><text x="892" y="203" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">= length</text>
+  <g stroke="#64748b" stroke-width="1.6" fill="none">
+    <path d="M92,123 L160,109" marker-end="url(#pa)"/>
+    <path d="M92,123 L160,141" marker-end="url(#pa)"/>
+    <path d="M92,123 L160,173" marker-end="url(#pa)"/>
+    <path d="M240,109 L300,123" marker-end="url(#pa)"/>
+    <path d="M240,141 L300,125" marker-end="url(#pa)"/>
+    <path d="M380,125 L440,145" marker-end="url(#pa)"/>
+    <path d="M380,173 L440,151" marker-end="url(#pa)"/>
+    <path d="M520,149 L700,134" marker-end="url(#pa)"/>
+    <path d="M800,134 L850,156" marker-end="url(#pa)"/>
+    <path d="M800,186 L850,166" marker-end="url(#pa)"/>
+  </g>
+  <path d="M240,173 L300,173" stroke="#c2410c" stroke-width="1.6" fill="none" marker-end="url(#pd)"/>
+  <path d="M520,153 Q600,153 600,186 L700,186" stroke="#c2410c" stroke-width="1.6" fill="none" stroke-dasharray="5 4" marker-end="url(#pd)"/>
+  <g transform="translate(60,300)">
+    <rect x="0" y="0" width="840" height="132" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="16" y="26" font-size="13" font-weight="700" fill="#0f172a">The alignment trick (state_pipe)</text>
+    <text x="16" y="50" font-size="11.5" fill="#334155">Each operand must reach an adder/multiplier on the same clock as its partner. Branches that finish early are</text>
+    <text x="16" y="68" font-size="11.5" fill="#334155">parked in a state_pipe shift-register (orange) so the two inputs line up:</text>
+    <text x="30" y="92" font-size="11.5" fill="#475569" font-family="Consolas, monospace">- z^2 ready at cyc 4 but x^2+y^2 not until cyc 8  -&gt; delay z^2 by 4.</text>
+    <text x="30" y="110" font-size="11.5" fill="#475569" font-family="Consolas, monospace">- sum ready at cyc 12 but isqrt(sum) not until cyc 28 -&gt; delay sum by 16, then multiply.</text>
+    <text x="16" y="128" font-size="10.5" fill="#94a3b8">This delay-to-align pattern recurs in scene_sdf, sdf_term, ray_gen - most "extra" code just keeps data in step.</text>
+  </g>
+</svg>

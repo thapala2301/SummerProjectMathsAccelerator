@@ -114,7 +114,6 @@ module ray_gen #(
 
     always_ff @(posedge clk) begin
         //after eye split, s0_px is 0 to 255
-        //unclear
         // do *4 , substract 510, then symetric around 0, px 127/128 straddle 0 
         s1_dx <= ({ {19{1'b0}}, s0_px, 2'b00 }) - 32'(IMG_W - 2);
         //same here, but invert the Y coordinate such that py=0 maps to positive 3D axis. 
@@ -122,21 +121,12 @@ module ray_gen #(
         s1_dz <= FOV_Z_CONST_X2; //carry through scaling
     end
 
-    // s1b: extra register to break s1_dy -> fp_int2fp -> u_normalize timing path (~7.9ns)
-    logic [31:0] s1b_dx, s1b_dy;
-    logic [26:0] s1b_dz;
-    always_ff @(posedge clk) begin
-        s1b_dx <= s1_dx;
-        s1b_dy <= s1_dy;
-        s1b_dz <= s1_dz;
-    end
-
     //s2 fp_int2fp convert int offset to 27bit float
     logic [26:0] s2_dx_f, s2_dy_f, s2_dz_f;
     always_ff @(posedge clk) begin
-        s2_dx_f <= fp_int2fp(s1b_dx[15:0]);
-        s2_dy_f <= fp_int2fp(s1b_dy[15:0]);
-        s2_dz_f <= s1b_dz;
+        s2_dx_f <= fp_int2fp(s1_dx[15:0]);
+        s2_dy_f <= fp_int2fp(s1_dy[15:0]);
+        s2_dz_f <= s1_dz;
     end
 
     //obtain the normalized vector for dx,dy,dz : dirx, diry, dz. vec/norm computation
