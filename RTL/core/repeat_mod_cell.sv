@@ -32,8 +32,8 @@ module repeat_mod_cell(
     logic        centred_neg_d;
 
     fp_add inst_add_half(.clk(clk), .a(p), .b(half_cell), .out(p_shifted));
-    // fp_mod inst_mod_p(.clk(clk), .a(p_shifted), .b(cell_sz), .rem(p_wrapped)); // original: 52 cycle latency, expensive DSPs+LUTs
-    fp_mod2 inst_mod_p(.clk(clk), .a(p_shifted), .rem(p_wrapped)); // cheap pow2 mod (cell_sz must be 2.0): 6 cycle latency, no DSPs
+    // fp_mod2 inst_mod_p(.clk(clk), .a(p_shifted), .b(cell_sz), .rem(p_wrapped)); // faster, less luts less dsp
+    fp_mod inst_mod_p(.clk(clk), .a(p_shifted), .rem(p_wrapped)); 
     fp_sub inst_sub_half(.clk(clk), .a(p_wrapped), .b(half_cell), .out(p_centred));
     fp_abs inst_abs_centred(.in(p_centred), .out(abs_centred));
 
