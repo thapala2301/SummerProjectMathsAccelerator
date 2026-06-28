@@ -24,11 +24,11 @@ Hardware HDMI output — stereo side-by-side for VR:
 |---|---|---|
 | ![](misc/Report_Sources/imgs/AppendixA/render_torus_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_gyroid_early_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_gyroid_spheres_stereo.jpg) |
 
-| Mandelbox boundary — spiky self-similar structures, NR approximation artefacts | Mandelbox interior — NR accumulations | Mandelbox spiral — NR accumulations |
+| Spheres boundary — spiky self-similar structures, NR approximation artefacts | Spheres interior — NR accumulations | Spheres spiral — NR accumulations |
 |---|---|---|
 | ![](misc/Report_Sources/imgs/AppendixA/render_mandelbox_closeup_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_mandelbox_interior_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_mandelbox_spiral_stereo.jpg) |
 
-| Mandelbox lattice — infinite spheres, cell_size=2 | Capsule SDF — single-sheet teardrop geometry | Infinite spheres close range |
+| Spheres lattice — infinite spheres, cell_size=2 | Capsule SDF — single-sheet teardrop geometry | Infinite spheres close range |
 |---|---|---|
 | ![](misc/Report_Sources/imgs/AppendixA/render_mandelbox_lattice_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_hyperboloid_stereo.jpg) | ![](misc/Report_Sources/imgs/AppendixA/render_gyroid_spheres2_stereo.jpg) |
 
