@@ -1,6 +1,6 @@
 # FPGA Ray Marcher — PYNQ-Z1
 
-A real-time 3D ray marcher built from scratch on the FPGA fabric of a PYNQ-Z1 (Zynq XC7Z020). No GPU, no CPU in the render loop. Every stage of the pipeline — floating-point arithmetic, ray generation, signed-distance evaluation, colour mapping, and HDMI output — is custom RTL running at 125 MHz on the PL.
+A real-time 3D ray marcher built from scratch on the FPGA fabric of a PYNQ-Z1 (Zynq XC7Z020). No GPU, no CPU in the render loop. Every stage of the pipeline — floating-point arithmetic, ray generation, signed-distance evaluation, colour mapping, and HDMI output — is custom RTL running at 125 MHz on the PL. Some designs also run at 150 Mhz. Timing has closed at 200 Mhz for scaffold before, but the code was since changed.
 
 **Imperial College London — Year 2 group project (EEE/EIE), June 2026.**
 
