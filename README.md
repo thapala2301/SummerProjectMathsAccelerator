@@ -1,147 +1,276 @@
-# Audio-Sync Ray Marcher — FPGA Accelerator
+# FPGA Ray Marcher — PYNQ-Z1
 
-> Real-time, audio-reactive 3D **ray marcher** built from scratch on a **PYNQ-Z1** (Zynq-7000 SoC) — no GPU, no soft-core. Custom RTL renders a signed-distance scene on the FPGA fabric and streams it over **HDMI at 720p60**, while a hardware **FFT** makes the geometry react to live music.
+A real-time 3D ray marcher built from scratch on the FPGA fabric of a PYNQ-Z1 (Zynq XC7Z020). No GPU, no CPU in the render loop. Every stage of the pipeline — floating-point arithmetic, ray generation, signed-distance evaluation, colour mapping, and HDMI output — is custom RTL running at 125 MHz on the PL.
 
-**Imperial College London — summer term group project (EEE/EIE).**
-📖 Deep-dive walkthrough and per-file explanations: [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md)
-
-<!--
-HERO IMAGE — capture a clean render and save as docs/images/hero.png, then uncomment below.
-  Option A (hardware): photograph the HDMI monitor running VivadoDesigns/ray_marcher_basev1.
-  Option B (software): cd Charlie && npm install && npm run dev → http://127.0.0.1:4176, screenshot the canvas.
-  Option C (RTL sim):  cd Vincent/Hardware && make → frame.ppm → sim_HDMI150MHz/convert_ppm_to_png.ps1.
--->
-<!-- ![Rendered scene](docs/images/hero.png) -->
+**Imperial College London — Year 2 group project (EEE/EIE), June 2026.**
 
 ---
 
-## Overview
+## What it does
 
-The system renders a 3D fractal-style scene by **ray marching** a signed-distance field (SDF): for each of 921,600 pixels it shoots a ray and steps along it until it hits a surface, colouring the pixel by how many steps it took. Every stage — ray generation, the marching feedback loop, the distance-field maths, colour mapping, and HDMI scan-out — is custom hardware running in a fully pipelined datapath. In parallel, incoming audio is transformed by a hardware FFT and its bass/mid/treble energy is fed into the scene so the geometry pulses with the music.
+For each of the 921,600 pixels in a 1280×720 frame, the hardware shoots a ray from the camera origin in the direction computed for that pixel, then steps along it repeatedly until it gets close enough to a surface (a "hit") or runs out of iterations. The distance to the surface at each step is evaluated by a signed-distance function (SDF) — a mathematical function that, given any point in 3D space, returns the distance to the nearest surface. Because the pipeline is fixed-latency, pixels don't loop in RTL; instead they recirculate through a FIFO, re-entering the pipeline for each march step.
 
-**What it demonstrates:** end-to-end FPGA system design — custom floating-point arithmetic, deep pipelining, clock-domain crossing, AXI hardware/software co-design, real-time video, and a hardware/PyTorch ML path — integrated across a six-person team into a single bitstream.
+When a pixel hits, its iteration count is mapped to an RGB colour and written to DDR3 over AXI4. The PS-side VDMA then streams that framebuffer to the HDMI output.
 
----
+The system also renders in stereo: two eye positions separated by `HALF_IPD` (half inter-pupillary distance) are computed simultaneously, producing a side-by-side left/right image for the VR headset.
 
-## Technical highlights
-
-- **Custom 27-bit floating-point ISA** (1·8·18) and a full FP library (`add/sub/mul/isqrt/length/min/max/abs`) hand-built to fit the FPGA's DSP/BRAM resources.
-- **Deeply pipelined render core** — e.g. a ~48-cycle ray generator and a 32-cycle vector-length unit — with explicit `state_pipe` delay lines to keep operands cycle-aligned.
-- **Feedback-loop scheduler** that runs an inherently iterative algorithm on a fixed pipeline: pixels recirculate one marching step per lap through a 190-bit × 128 FIFO, with a returning-rays-win arbiter to prevent overflow.
-- **Hardware/software co-design** — 1024-point Xilinx FFT IP + AXI-DMA streaming into DDR, band extraction in PYNQ Python, piped back into the SDF as live parameters.
-- **Real-time video** — RGB332 double-buffered framebuffer and a 720p60 HDMI scan-out across two clock domains (≈150 MHz compute · 74.25 MHz pixel).
-- **Neural SDF (research path)** — a PyTorch MLP trained to approximate the distance field, quantised to Q4.12 and baked into BRAM for fixed-cost hardware inference.
-
-**Skills:** SystemVerilog/Verilog · Vivado block design · AXI4-Lite/Stream/DMA · Verilator & Icarus simulation · WebGL2/GLSL · PyTorch · digital arithmetic & pipelining.
+Camera position, orientation, and scene parameters are set at runtime from a Python script running on the Zynq PS over AXI-Lite — no recompilation needed to move the camera.
 
 ---
 
-## Architecture
+## Architecture overview
 
-<img src="docs/images/architecture.svg" alt="System architecture" width="600">
-
-Two clock domains: compute ~150 MHz (200 MHz variant in `Jai/hdmi_200mhz/`) · pixel 74.25 MHz. The framebuffer BRAM bridges them, double-buffered. The software renderer (`Charlie/`) and GLSL prototypes (`Vincent/SW_raymarching/`) are reference implementations that mirror the hardware scene.
-
----
-
-## Render loop
-
-<img src="docs/images/render_loop.svg" alt="Per-pixel render loop" width="760">
-
-`pixel_dispatch` emits one pixel/clock → `feedback_ctrl` arbitrates fresh vs returning rays (returning win) → `ray_gen` builds the ray → `march_core` steps once via `scene_sdf`; miss ⇒ loop back through the FIFO, hit/limit ⇒ `iter_to_rgb` → `fb_write` → framebuffer → `scan_out`. Full per-pixel trace: `LEARNING_GUIDE.md` §3.
-
----
-
-## Team & contributions
-
-| Member | Ownership | Stack |
-|--------|-----------|-------|
-| Charlie | Software reference renderer (WebGL2 GPU + CPU) | React, Vite, WebGL2 |
-| Geralt | Audio FFT pipeline (PL FFT/DMA + PS extraction) | Vivado, Xilinx FFT IP, AXI-Stream/DMA, PYNQ |
-| Jai | Ray generation + 27-bit FP datapath | SystemVerilog |
-| Sakthivel | HDMI output — framebuffer, scan-out, timing, palette. SDF testbenches, VR Headset CAD | SystemVerilog, Vivado |
-| Thanus | Pixel-dispatch / feedback scheduler · FFT bridge + audio pipeline · SDF shape library · neural-SDF training | SystemVerilog, PyTorch |
-| Vincent | Ray-marcher core (analytic + neural) + FP library | SystemVerilog, Verilog, Verilator |
-
-Integration into a single PYNQ-Z1 bitstream lives in `VivadoDesigns/ray_marcher_basev1/`.
-
----
-
-## Modules
-
-| Module | Owner | What it does |
-|--------|-------|--------------|
-| **`Charlie/`** | Charlie | WebGL2 fragment-shader marcher (`gpu_renderer.js`) + JS mirror (`cpu_renderer.js`) + fly camera. Visual reference — `npm run dev` → :4176. |
-| **`Geralt_fft/`** | Geralt | 1024-pt FFT IP (AXI-Stream) → AXI DMA → DDR. PS `server.py` unpacks complex, computes `√(R²+I²)`, splits bins 0–511 into bass / mid / high. |
-| **`Jai/`** | Jai | `ray_gen.sv` — ~48-cycle pipeline turning pixel + camera into a ray in 27-bit FP; `axi_camera_regs.sv` AXI-Lite camera. `hdmi_200mhz/` = 200 MHz mirror. |
-| **`Thanus/`** | Thanus | Render scheduler: `pixel_dispatch` (1280×720 scan, half-res `pix_id`), `feedback_ctrl` (fresh/return arbiter, 190-bit × 128 FIFO), `fb_write` (combinational BRAM write). Full TB suite (`run_tests.bat`). |
-| **`Thanus/` FFT bridge** | Thanus | `fft_bridge.v` — per-frame bass/mid/treble/total-energy accumulators → sensitivity slices → `int2fp` → 11 frame-stable 27-bit FP outputs. Four new audio-reactive SDF parameters: `out_domain_fold` (bass → grid tiling), `out_twist` (mid → rotation), `out_epsilon` (treble → surface bloom), `out_sdf_scale` (total energy → scene scale). Xilinx CORDIC IP converts FFT real/imag to magnitude. All outputs propagated through `top.sv` → `march_core` → `scene_sdf`, replacing hardcoded constants. PS-side pipeline: `audio_sender.py` (laptop mic → Python FFT → 11 floats over TCP) and `board.py` (PYNQ TCP receiver → `fp32_to_fp27` → AXI MMIO register writes). Timing: WNS = +3.170 ns. |
-| **`Thanus/` SDF library** | Thanus | 15+ standalone analytic SDF modules, each following the same clocked fp_-library interface as `scene_sdf`. Shapes: `sdf_sphere`, `sdf_torus`, `sdf_octahedron`, `sdf_gyroid` (Taylor-series sin/cos), `sdf_twisted_torus` (domain rotation), `sdf_chain_link` (clamped torus), `sdf_capsule`, `sdf_box`, `sdf_rounded_box`, `sdf_ellipsoid`, `sdf_pyramid`, `sdf_disk`, `sdf_pipe`, `sdf_vesica`, `sdf_hyperboloid`, `sdf_spiral`, `sdf_mandelbulb`. All pipeline-synchronised with explicit `state_pipe` delay lines. |
-| **`Thanus_Neural/`** | Thanus | *Research path:* MLP `3→64→64→64→1` trained on analytical SDFs (sphere loss ~3e-5, torus ~5e-5, Mandelbox ~9e-3); `export_weights.py` → Q4.12 hex for `$readmemb`. |
-| **`Vincent/`** | Vincent | Marcher core + the shared 27-bit FP library. Analytic `scene_sdf` (box-frame + domain repetition) and a neural BRAM-bake path; Verilator sim → `.ppm`; GLSL prototypes. |
-| **`Sakthivel/HDMI_Intial/`** | Sakthivel | `framebuffer_bram` (RGB332), `scan_out` (double-buffer + CDC), `hdmi_timing` (720p60, 1650×750 @ 74.25 MHz), `iter_to_rgb` / `palette`. |
-| **`VivadoDesigns/`** | All | Integrated block design + bitstream for the PYNQ-Z1. IP: rgb2dvi (HDMI), cordic (FFT magnitude). |
-
-Per-file detail for every module is in [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md) §5.
-
----
-
-## Results
-
-**Hardware FFT spectrum** — live audio transformed on the PL and read back over DMA:
-
-![FFT spectrum](docs/images/fft_spectrum.png)
-
-**Neural SDF** — learned zero-contour cross-sections after training (sphere test loss ~3e-5):
-
-| Sphere | Torus |
-|---|---|
-| ![Sphere result](docs/images/neural_sphere.png) | ![Torus result](docs/images/neural_torus.png) |
-
-<!-- Regenerate FFT: run server.py on the board with FPGA_FFT.html playing audio, screenshot the spectrum.
-     Regenerate neural: cd Thanus_Neural && python sphere_test.py && python visualise.py -->
-
----
-
-## Custom 27-bit float
-
-Every hardware datapath shares one number format, sized to fit the FPGA's DSP/BRAM resources while keeping enough precision for stable marching:
-
-<img src="docs/images/fp27_format.svg" alt="27-bit floating-point format" width="640">
-
-Neural weights use Q4.12 (16-bit) via `fp_to_q4_12` / `q4_12_to_fp` at the boundary. Worked example and the full FP library: [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md) §2.4.
-
----
-
-## Build & run
-
-```bash
-# Software renderer
-cd Charlie && npm install && npm run dev          # http://127.0.0.1:4176
-
-# RTL simulation (Verilator) → frame.ppm
-cd Vincent/Hardware && make
-
-# Scheduler tests (Icarus)
-cd Thanus && run_tests.bat
-
-# Neural SDF
-cd Thanus_Neural && pip install torch numpy matplotlib trimesh
-python sphere_test.py && python visualise.py && python export_weights.py
-
-# Audio pipeline (laptop side)
-cd Vincent && pip install sounddevice numpy scipy
-python audio_sender.py                           # streams mic audio to PYNQ over TCP
-
-# Audio pipeline (PYNQ side)
-# Copy board.py to PYNQ, update bitstream path, then:
-python3 board.py                                 # receives audio params, writes to AXI registers
-
-# Audio FFT: flash Geralt_fft/jupyter notebook/audio_fft.bit on PYNQ-Z1, run server.py
-# Full HW: open VivadoDesigns/ray_marcher_basev1 in Vivado 2020.x+, gen bitstream, program board
+```
+                    ┌─────────────────────────────────────────┐
+                    │              PL (125 MHz)                │
+                    │                                          │
+   AXI-Lite ───────►│  axi_camera_regs ──► cam params         │
+   (from PS)        │                          │               │
+                    │  pixel_dispatch ──────────────────────►  │
+                    │         │                │               │
+                    │         ▼                ▼               │
+                    │  feedback_ctrl ◄── march_core            │
+                    │    (FIFO 190b)      (scene_sdf)          │
+                    │         │                │               │
+                    │         │     hit        ▼               │
+                    │         └──────────► ddr_rgb_writer      │
+                    │                          │               │
+                    └──────────────────────────┼───────────────┘
+                                               │ AXI4 master
+                                               ▼
+                                           DDR3 (PS)
+                                               │
+                                           VDMA (PS)
+                                               │
+                                           rgb2dvi IP
+                                               │
+                                           HDMI out
 ```
 
-**Requires:** PYNQ-Z1 · HDMI 720p60 display · 44.1 kHz audio · Vivado 2020.x+ · Node.js + WebGL2 browser · Python 3 (`torch numpy matplotlib trimesh sounddevice`) · Verilator + Icarus Verilog.
+![System architecture](misc/images/architecture.svg)
+
+The render pipeline in more detail:
+
+1. `pixel_dispatch` counts through raster order (x=0..WIDTH, y=0..HEIGHT), outputting one pixel coordinate per clock when `pipeline_ready` is high.
+2. `feedback_ctrl` decides whether to feed a fresh pixel or a returning ray into the march core. Returning rays take priority — this prevents FIFO overflow. It holds a 190-bit-wide FIFO of in-progress rays (20 bits pix_id + 81 bits position + 81 bits direction + 8 bits iteration count).
+3. `ray_gen` turns pixel coordinates into a normalised ray direction in world space using the camera lookat matrix. For returning rays the direction is passed through unchanged.
+4. `march_core` evaluates one SDF step: it calls `scene_sdf`, adds `sdf_dist × step_scale` to the current position, and checks whether to hit, miss, or continue.
+5. Hits go to `ddr_rgb_writer` which writes RGB24 to DDR3. Misses go back to `feedback_ctrl` via the FIFO.
+6. The VDMA streams the completed framebuffer from DDR3 to `rgb2dvi`, which produces TMDS differential pairs for HDMI at 720p60.
+
+![Render loop detail](misc/images/render_loop.svg)
+
+---
+
+## Custom 27-bit floating point (FP27)
+
+Standard 32-bit IEEE 754 was too wide for efficient DSP48 use on the Artix-7. The DSP48E1 has an 18×27 bit multiplier — so we defined our own format sized to fit:
+
+```
+ bit 26    bits 25:18     bits 17:0
+┌────────┬─────────────┬──────────────────────┐
+│  sign  │  exponent   │      mantissa        │
+│  (1b)  │  (8b, b127) │      (18b)           │
+└────────┴─────────────┴──────────────────────┘
+```
+
+Exponent bias is 127, same as IEEE 754 single. No denormals, no NaN — the hardware assumes inputs are always valid finite numbers in the range the marcher produces. Multiplication maps onto a single DSP48E1 slice (18×18 product, upper 18 bits taken as the mantissa result).
+
+![FP27 format](misc/images/fp27_format.svg)
+
+All modules in `RTL/FP_Lib/` share the same interface: `clk`, `a[26:0]`, `b[26:0]` (or just `a` for unary), `out[26:0]`. Operands are cycle-aligned across the pipeline using `state_pipe.v`, which infers SRL32 shift registers in Vivado.
+
+### Key constant encodings
+
+| Value | FP27 hex | How |
+|-------|----------|-----|
+| 0.0 | `27'h0` | sign=0, exp=0 (underflows to zero) |
+| 1.0 | `27'h1FC0000` | sign=0, exp=127, mantissa=0 |
+| 2.0 | `27'h2000000` | sign=0, exp=128, mantissa=0 |
+| 1.5 | `27'h1FE0000` | sign=0, exp=127, mantissa=2^17 |
+| −1.0 | `27'h3FC0000` | sign=1, exp=127, mantissa=0 |
+
+### Full library
+
+| Module | Op | Latency (cycles) | Notes |
+|--------|-----|---------|-------|
+| `fp_add.v` | a + b | 4 | Aligns mantissas, adds, renormalises |
+| `fp_sub.v` | a − b | 4 | Same as add with b sign flipped |
+| `fp_mul.v` | a × b | 4 | One DSP48E1 per instance |
+| `fp_isqrt.v` | 1/√a | 16 | Quake magic number + 1× Newton-Raphson |
+| `fp_length.v` | √(x²+y²+z²) | 32 | 3×fp_mul + 2×fp_add + fp_isqrt + fp_mul |
+| `fp_normalize.sv` | v/‖v‖ | 36 | fp_length + 3×fp_mul |
+| `fp_abs.v` | \|a\| | comb | Clear sign bit |
+| `fp_max.v` | max(a,b) | comb | Comparator + mux |
+| `fp_min.v` | min(a,b) | comb | Comparator + mux |
+| `fp_negate.v` | −a | comb | Flip sign bit |
+| `fp_mod2.v` | a mod 2 | pipelined | Used for domain repetition |
+| `fp_mul_vec3_mat33.sv` | v·M | pipelined | 9×fp_mul + 6×fp_add |
+| `int2fp.v` | int → FP27 | comb | For pixel coords in ray_gen |
+| `fp_div.sv` | a / b | pipelined | fp_isqrt + fp_mul |
+| `fp_floor.sv` | floor(a) | pipelined | |
+| `fp_mod.sv` | a mod b | pipelined | |
+| `fp_inverse.sv` | 1/a | pipelined | |
+
+---
+
+## The march loop in detail
+
+### Ray generation (`RTL/core/ray_gen.sv`)
+
+Takes pixel coordinates (x, y) and the 3×3 camera lookat matrix (right, up, forward vectors) and produces a normalised ray direction in world space.
+
+Steps:
+1. Convert integer pixel (x,y) to centred normalised device coordinates: `ndc_x = (x - W/2) / W`, `ndc_y = (y - H/2) / H`.
+2. Multiply by FOV constant and the lookat matrix to get the ray direction in world space.
+3. Normalise using `fp_normalize`.
+
+For stereo, `march_core` splits each pixel into left and right eye origins by offsetting `cam_origin` by `±HALF_IPD × lookat_right`. The two rays share the same direction but diverge from different origins.
+
+Total latency: **48 cycles**.
+
+### March core (`RTL/core/march_core.sv`)
+
+One pass through `march_core` advances a ray by one SDF step:
+
+1. The current position `(pos_x, pos_y, pos_z)` is passed through optional domain repetition (`repeat_mod_cell`), folding the ray into a tiling cell.
+2. The folded position is passed to `scene_sdf` which returns the signed distance to the surface.
+3. `new_pos = pos + ray_dir × sdf_dist × step_scale` (clamped to avoid overshooting).
+4. If `sdf_dist < HIT_THRESH` → hit, output pixel to `ddr_rgb_writer`.
+5. If `iter == MAX_ITER` → background colour.
+6. Otherwise → output to feedback FIFO for another pass.
+
+`state_pipe` instances keep `pos`, `dir`, `pix_id`, and `iter` aligned to the SDF output latency, which varies per scene. Each scene has a `SCENE_CORE_LAT` parameter, and `SDF_LAT = REPEAT_LAT + SCENE_CORE_LAT`.
+
+### Domain repetition (`RTL/core/repeat_mod_cell.sv`)
+
+Tiles the scene infinitely in XZ by mapping position `p` into `[-half_cell, +half_cell]`:
+
+```
+q = (p + half_cell) mod cell_sz − half_cell
+```
+
+Standard `mod` on negative inputs gives a negative remainder in FP, which would shift the geometry off-centre. `repeat_mod_cell` detects and corrects this. Latency: 18 cycles.
+
+---
+
+## SDF scenes
+
+### Twisted torus (`RTL/sdf/twisted_torus_sdf.v`) — working on hardware
+
+A standard torus with a domain twist applied along the Y axis: the XZ plane is rotated by `angle = py × TWIST` before the torus SDF is evaluated, producing a helical twist. `cos` and `sin` are approximated using Taylor series (1 − θ²/2 and θ − θ³/6 respectively).
+
+`SCENE_CORE_LAT = 101`
+
+<!-- Twisted torus render from hardware HDMI output -->
+<!-- ![Twisted torus on HDMI](misc/images/twisted_torus_hdmi.jpg) -->
+
+<!-- Twisted torus PPM from Verilator sim -->
+<!-- ![Twisted torus sim render](misc/images/twisted_torus_sim.png) -->
+
+### Menger sponge (`RTL/sdf/NOTWORKINGmenger_sdf.sv`) — sim verified, HW dispatch issue
+
+Three-level box-frame IFS (Iterated Function System). At each level, the position is folded using `abs` and recentred, then the box-frame SDF is evaluated on the scaled-down result. Domain repetition tiles the sponge with `repeat_mod_cell` in XZ.
+
+`SCENE_CORE_LAT = 83`, `REPEAT_LAT = 18`, `SDF_LAT = 101`
+
+<!-- Menger sponge PPM from Verilator simulation -->
+<!-- Generate: cd SIM_testbenches && make menger_ppm && open menger.ppm -->
+<!-- ![Menger sponge sim render](misc/images/menger_sim.png) -->
+
+### Mandelbox (`RTL/sdf/NOTWORKINGmandelbox.sv`) — sim verified, needs adding to Vivado
+
+4-iteration orbit trap with scale = −1.5. Each iteration applies:
+1. `fp_clamp1`: clamp each component to [−1, 1] (combinational)
+2. `z = 2×clamp(z) − z` (fold)
+3. Spherical fold: if `|z| < minRadius`, scale; if `|z| < fixedRadius`, scale
+4. `z = scale×z + c`
+
+After 4 iterations, the SDF is `length(z) × scale_factor`.
+
+`fp_clamp1` and `fp_times2` are purely combinational (a comparator + mux, and a 1-bit exponent increment respectively), keeping the 4-iteration loop tight.
+
+`SCENE_CORE_LAT = 234`, `REPEAT_LAT = 0` (no spatial tiling)
+
+Inside-point test results (from Verilator testbench, all 9 pass):
+- Origin (0,0,0): SDF ∈ [0.000, 0.010] ✓
+- Inside sphere (0,0,−1): SDF ∈ [0.000, 0.500] ✓
+- Near bounding sphere (2.5,0,0): SDF ∈ [0.000, 2.000] ✓
+
+<!-- Mandelbox PPM from Verilator simulation -->
+<!-- Generate: cd SIM_testbenches && make mandelbox_ppm && open mandelbox.ppm -->
+<!-- ![Mandelbox sim render](misc/images/mandelbox_sim.png) -->
+
+---
+
+## Render outputs
+
+### Hardware HDMI
+
+<!-- Photograph of the PYNQ-Z1 HDMI output on a monitor -->
+<!-- ![HDMI output — twisted torus](misc/images/hdmi_twisted_torus.jpg) -->
+
+<!-- Photograph of stereo side-by-side image for VR headset -->
+<!-- ![HDMI stereo output](misc/images/hdmi_stereo.jpg) -->
+
+### Simulation PPM renders
+
+These are generated by the Verilator C++ testbenches and reflect exactly what the RTL produces, pixel-accurate:
+
+<!-- ![Menger sponge (sim)](misc/images/menger_sim.png) -->
+<!-- ![Mandelbox (sim)](misc/images/mandelbox_sim.png) -->
+<!-- ![Twisted torus (sim)](misc/images/twisted_torus_sim.png) -->
+
+### GPU reference renders (OpenGL / ShaderToy)
+
+Software reference implementations used during development to validate the SDF maths before committing to RTL. In `GPURenders/`:
+
+<!-- ![Menger reference (GPU)](misc/images/menger_gpu.png) -->
+<!-- ![Mandelbox reference (GPU)](misc/images/mandelbox_gpu.png) -->
+
+---
+
+## VR headset
+
+We designed a VR headset enclosure in SolidWorks that holds a small screen driven by the PYNQ-Z1 HDMI output and mounts onto a Meta Quest 3 head strap. The stereo rendering in the RTL (two eye origins separated by `HALF_IPD`) produces the left/right image pair.
+
+Full CAD files in `CAD/` — see [CAD/README.md](CAD/README.md).
+
+<!-- Photo: assembled headset -->
+<!-- ![VR headset assembled](misc/images/headset_assembled.jpg) -->
+
+<!-- Photo: headset worn -->
+<!-- ![VR headset worn](misc/images/headset_worn.jpg) -->
+
+---
+
+## Neural SDF (research path)
+
+A parallel research thread: instead of an analytic SDF, train a small MLP to approximate the distance field, bake the result into a 3D grid stored in BRAM, and use trilinear interpolation at query time.
+
+Network: `3 → 32 → 32 → 32 → 1`, ReLU activations. Weights exported as Q4.12 (16-bit fixed point) for `$readmemb`. Training losses: sphere ~3×10⁻⁵, torus ~5×10⁻⁵.
+
+The RTL inference path (`Neural_SDF_Research/Neural_RTL/`) is independent of the main render pipeline and would slot in as a drop-in replacement for `scene_sdf`.
+
+Full details: [Neural_SDF_Research/README.md](Neural_SDF_Research/README.md).
+
+![Neural SDF sphere result](misc/images/neural_sphere.png)
+
+| Sphere | Torus |
+|--------|-------|
+| ![Sphere fit](misc/images/neural_sphere.png) | ![Torus fit](misc/images/neural_torus.png) |
+
+---
+
+## PYNQ control
+
+All camera and scene parameters are written to the PL at runtime via AXI-Lite. No bitstream regeneration is needed to move the camera or change scene geometry.
+
+`SCRIPTS/PYNQ/ctrl.py` sets up the VDMA (frame buffer addresses, stride, size), then starts a TCP server that accepts camera packets from `SCRIPTS/Computer/camera_mmio_controller.py` running on a laptop. Each packet contains 12 floats: the 3×3 lookat matrix and 3D camera origin. Scene parameters (cell size, shape size, RGB colours, audio energy values) are also writable at runtime.
+
+`SCRIPTS/PYNQ/ui_base_selector.py` provides a simple on-board UI (visible via the PYNQ web interface) for switching between the base Vivado design and the ray marcher.
+
+Full details: [SCRIPTS/README.md](SCRIPTS/README.md).
 
 ---
 
@@ -149,23 +278,57 @@ python3 board.py                                 # receives audio params, writes
 
 ```
 SummerProjectMathsAccelerator/
-├─ Charlie/                Software reference renderer (React + WebGL2)
-├─ Geralt_fft/             Audio FFT pipeline (Vivado IP + PYNQ Python)
-│  ├─ docs/                  FFT notes + waveform captures
-│  └─ jupyter notebook/      PYNQ server + bitstream
-├─ Jai/                    Ray generation + 27-bit FP datapath
-│  └─ hdmi_200mhz/           Self-contained 200 MHz RTL + sim mirror
-├─ Sakthivel/HDMI_Intial/  HDMI output — framebuffer, scan-out, timing
-├─ Thanus/                 Pixel-dispatch / feedback scheduler + FIFO
-├─ Thanus_Neural/          PyTorch neural-SDF training + Q4.12 export
-├─ Vincent/                Ray-marcher core (analytic + neural) + FP library
-│  ├─ Hardware/              Floating_Point_Lib, RTL, Verilator sim
-│  └─ SW_raymarching/        GLSL shader prototypes
-├─ VivadoDesigns/          Integrated block design + bitstream
-├─ sim_HDMI150MHz/         Top-level Verilator sim harness
-├─ docs/images/            Diagrams + result captures
-├─ LEARNING_GUIDE.md       Full high→low onboarding guide
-└─ progress_log.txt        Running project log
+├─ RTL/
+│  ├─ FP_Lib/          Custom 27-bit floating-point library (16 modules)
+│  ├─ core/            Ray generation, march core, domain repeat, state pipe
+│  ├─ sdf/             SDF scenes: twisted torus, menger, mandelbox, sphere
+│  ├─ control/         Pixel dispatch, feedback FIFO controller
+│  ├─ video/           DDR3 AXI4 writer, colour palette
+│  └─ top/             Top-level wiring: top.sv, top_ps.sv (PS wrapper)
+├─ SIM_testbenches/    Verilator C++ PPM renders + SV unit testbenches
+├─ VivadoDesigns/      Vivado block design, UI notebook, bitstream handoff
+├─ ip_repo/            axi_camera_regs AXI-Lite IP, rgb2dvi HDMI IP
+├─ constraints/        XDC pin constraints for PYNQ-Z1
+├─ ip/                 Vivado-generated IP outputs (clk_wiz, rgb2dvi)
+├─ CAD/                SolidWorks VR headset parts and assembly
+├─ SCRIPTS/            PYNQ Python control, PC camera sender, Vivado TCL
+├─ GPURenders/         OpenGL and ShaderToy reference renders
+├─ Neural_SDF_Research/ PyTorch MLP training + Q4.12 RTL inference path
+└─ misc/images/        Architecture SVGs, pipeline diagrams, result images
 ```
 
-**Status (01/06/26):** core marcher functional; integration into `ray_marcher_basev1` underway; neural path experimental.
+See the README in each subfolder for details.
+
+---
+
+## Building and running
+
+### Simulation (Verilator)
+
+```bash
+cd SIM_testbenches
+make menger_ppm        # renders menger.ppm
+make mandelbox_ppm     # renders mandelbox.ppm
+```
+
+### SV unit tests
+
+```bash
+cd SIM_testbenches
+# Icarus or Questa required
+bash run_all_tests.sh
+```
+
+### Hardware
+
+1. Open `VivadoDesigns/UI_Vivado/` in Vivado 2020.x+.
+2. Run synthesis, implementation, generate bitstream.
+3. Program the PYNQ-Z1.
+4. On the board: `python3 SCRIPTS/PYNQ/ctrl.py`
+5. On the PC: `python3 SCRIPTS/Computer/camera_mmio_controller.py`
+
+**Hardware requirements:** PYNQ-Z1 · HDMI 720p60 display · Vivado 2020.x+ · Python 3 (pynq, numpy, struct, socket)
+
+---
+
+**Status (June 2026):** twisted torus rendering on hardware. Menger sponge RTL verified in simulation — dispatch bug (frame_ready_valid stuck) under investigation. Mandelbox RTL verified in simulation — needs adding to Vivado project before hardware test. Neural SDF path functional in simulation.
